@@ -156,7 +156,7 @@ Notes:
   --log-level INFO
 
 
-7c. Full pipeline in one command: train, evaluate, push once to HF after evaluation, sync local README, commit, and push GitHub
+7c. Full pipeline in one command: first run auto-tunes train and eval speed, then trains, evaluates, pushes once to HF after evaluation, syncs local README, commits, and pushes GitHub
 .\venv310\Scripts\python scripts\run_train_eval_publish.py `
   --run-name full_3_epoch_mask_run `
   --dataset combined `
@@ -165,7 +165,6 @@ Notes:
   --batch-size 1 `
   --global-batch-size 8 `
   --eval-batch-size 1 `
-  --eval-generation-batch-size 8 `
   --image-size 512 `
   --device cuda `
   --output-dir artifacts\full_3_epoch_mask_run `
@@ -174,6 +173,11 @@ Notes:
   --git-remote origin `
   --git-branch main `
   --log-level INFO
+
+Notes:
+- On the first run, this script writes `artifacts\full_3_epoch_mask_run\pipeline_autotune.json`
+- Later runs reuse that saved fastest config automatically
+- Use `--rebenchmark` if you want to force a fresh speed search
 
 
 8. Important notes
