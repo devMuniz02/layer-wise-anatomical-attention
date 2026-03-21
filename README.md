@@ -25,8 +25,7 @@ metrics:
 [![GitHub Profile](https://img.shields.io/badge/GitHub-devMuniz02-181717?logo=github&logoColor=white)](https://github.com/devMuniz02)
 [![Portfolio](https://img.shields.io/badge/Portfolio-devmuniz02.github.io-0F172A?logo=googlechrome&logoColor=white)](https://devmuniz02.github.io/)
 [![GitHub Repo](https://img.shields.io/badge/Repository-layer--wise--anatomical--attention-181717?logo=github&logoColor=white)](https://github.com/devMuniz02/layer-wise-anatomical-attention)
-[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-manu02-FFD21E?logo=huggingface&logoColor=yellow)](https://huggingface.co/manu02)
-[![HF Model](https://img.shields.io/badge/HF%20Model-LAnA-FFB000?logo=huggingface&logoColor=yellow)](https://huggingface.co/manu02/LAnA)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-manu02-FFD21E?logoColor=black)](https://huggingface.co/manu02)
 
 ![Layer-Wise Anatomical Attention](assets/AnatomicalAttention.gif)
 
@@ -35,7 +34,7 @@ metrics:
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `11.43%` (`0.343` / `3` epochs)
+- Training completion toward planned run: `0.71%` (`0.021` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Overview
@@ -76,13 +75,13 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 - Scheduler: `cosine`
 - Warmup steps: `5114`
 - Weight decay: `0.01`
-- Steps completed: `11692`
+- Steps completed: `726`
 - Planned total steps: `102276`
-- Images seen: `93549`
-- Total training time: `3.3335` hours
+- Images seen: `5808`
+- Total training time: `0.1667` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `2.3043`
-- Validation loss: `1.9204`
+- Final train loss: `4.1784`
+- Validation loss: `5.3722`
 
 ## MIMIC Test Results
 
@@ -90,10 +89,10 @@ Frontal-only evaluation using `PA/AP` studies only.
 
 | Metric | Value |
 | --- | --- |
-| Number of studies | `3041` |
-| RadGraph F1 | `0.0000` |
-| CheXpert F1 micro | `0.0000` |
-| CheXpert F1 macro | `0.0000` |
+| Number of studies | TBD |
+| RadGraph F1 | TBD |
+| CheXpert F1 micro | TBD |
+| CheXpert F1 macro | TBD |
 
 ## Inference
 
@@ -192,11 +191,11 @@ print(report)
 - Dataset: `MIMIC-CXR test`
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
-- CheXpert F1 micro: `0.0000`
-- CheXpert F1 macro: `0.0000`
-- RadGraph F1: `0.0000`
-- RadGraph entity F1: `0.0000`
-- RadGraph relation F1: `0.0000`
+- CheXpert F1 micro: `0.0966`
+- CheXpert F1 macro: `0.0490`
+- RadGraph F1: `0.0152`
+- RadGraph entity F1: `0.0243`
+- RadGraph relation F1: `0.0204`
 - RadGraph available: `True`
 - RadGraph error: `None`
 
@@ -211,7 +210,7 @@ Frontal-only evaluation using `PA/AP` studies only. Number of evaluated studies:
 
 | Metric | Value |
 | --- | --- |
-| RadGraph F1 | `0.0000` |
-| CheXpert F1 micro | `0.0000` |
-| CheXpert F1 macro | `0.0000` |
+| RadGraph F1 | `0.0152` |
+| CheXpert F1 micro | `0.0966` |
+| CheXpert F1 macro | `0.0490` |
 <!-- MIMIC_TEST_RESULTS_END -->
