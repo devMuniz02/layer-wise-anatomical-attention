@@ -624,6 +624,29 @@ def restore_checkpoint(output_dir: Path, args, device: torch.device, sampler: St
     try:
         payload = torch.load(resume_path / "training_state.pt", map_location="cpu", weights_only=False)
         method = payload["summary"]["method"]
+        checkpoint_summary = payload["summary"]
+        requested_accumulation_steps, requested_effective_global_batch_size = compute_accumulation_steps(
+            args.batch_size,
+            args.global_batch_size,
+        )
+        previous_batch_size = int(checkpoint_summary.get("batch_size", args.batch_size))
+        previous_effective_global_batch_size = int(
+            checkpoint_summary.get("global_batch_size", requested_effective_global_batch_size)
+        )
+        previous_accumulation_steps = int(
+            checkpoint_summary.get("gradient_accumulation_steps", requested_accumulation_steps)
+        )
+        if (
+            previous_batch_size != int(args.batch_size)
+            or previous_effective_global_batch_size != int(requested_effective_global_batch_size)
+            or previous_accumulation_steps != int(requested_accumulation_steps)
+        ):
+            raise RuntimeError(
+                "Checkpoint optimization config does not match the requested resume config. "
+                f"checkpoint batch/global/accum={previous_batch_size}/{previous_effective_global_batch_size}/{previous_accumulation_steps}, "
+                f"requested={args.batch_size}/{requested_effective_global_batch_size}/{requested_accumulation_steps}. "
+                "Start a fresh run or resume with the same batch settings."
+            )
         model = build_model(method, args, device)
         missing, unexpected = model.load_state_dict(payload["model_state"], strict=False)
         if missing or unexpected:
@@ -721,7 +744,12 @@ def timed_training(args, method: str, train_loader, train_sampler, eval_loader, 
         optimizer = restored["optimizer"]
         scheduler = restored["scheduler"]
         summary = restored["summary"]
+        summary["run_name"] = args.run_name
         summary["target_epochs"] = args.epochs
+        summary["image_size"] = args.image_size
+        summary["batch_size"] = args.batch_size
+        summary["global_batch_size"] = effective_global_batch_size
+        summary["gradient_accumulation_steps"] = accumulation_steps
         summary["steps_per_epoch"] = steps_per_epoch
         summary["planned_total_steps"] = total_training_steps
         summary["scheduler"] = "cosine"

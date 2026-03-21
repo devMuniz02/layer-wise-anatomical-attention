@@ -156,6 +156,26 @@ Notes:
   --log-level INFO
 
 
+7c. Full pipeline in one command: train, evaluate, push once to HF after evaluation, sync local README, commit, and push GitHub
+.\venv310\Scripts\python scripts\run_train_eval_publish.py `
+  --run-name full_3_epoch_mask_run `
+  --dataset combined `
+  --epochs 3 `
+  --duration 40m `
+  --batch-size 1 `
+  --global-batch-size 8 `
+  --eval-batch-size 1 `
+  --eval-generation-batch-size 8 `
+  --image-size 512 `
+  --device cuda `
+  --output-dir artifacts\full_3_epoch_mask_run `
+  --method lora_adamw `
+  --repo-id manu02/LAnA `
+  --git-remote origin `
+  --git-branch main `
+  --log-level INFO
+
+
 8. Important notes
 - Active dataset paths:
   Datasets\CheXpert\images
