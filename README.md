@@ -35,7 +35,7 @@ metrics:
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `10.35%` (`0.311` / `3` epochs)
+- Training completion toward planned run: `11.43%` (`0.343` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Overview
@@ -76,13 +76,13 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 - Scheduler: `cosine`
 - Warmup steps: `5114`
 - Weight decay: `0.01`
-- Steps completed: `10587`
+- Steps completed: `11692`
 - Planned total steps: `102276`
-- Images seen: `84707`
-- Total training time: `2.6667` hours
+- Images seen: `93549`
+- Total training time: `3.3335` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `3.1225`
-- Validation loss: `1.9598`
+- Final train loss: `2.3043`
+- Validation loss: `1.9204`
 
 ## MIMIC Test Results
 
@@ -91,9 +91,9 @@ Frontal-only evaluation using `PA/AP` studies only.
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
-| RadGraph F1 | `0.0754` |
-| CheXpert F1 micro | `0.1121` |
-| CheXpert F1 macro | `0.0747` |
+| RadGraph F1 | `0.0000` |
+| CheXpert F1 micro | `0.0000` |
+| CheXpert F1 macro | `0.0000` |
 
 ## Inference
 
@@ -192,11 +192,11 @@ print(report)
 - Dataset: `MIMIC-CXR test`
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
-- CheXpert F1 micro: `0.1121`
-- CheXpert F1 macro: `0.0747`
-- RadGraph F1: `0.0754`
-- RadGraph entity F1: `0.0918`
-- RadGraph relation F1: `0.0834`
+- CheXpert F1 micro: `0.0000`
+- CheXpert F1 macro: `0.0000`
+- RadGraph F1: `0.0000`
+- RadGraph entity F1: `0.0000`
+- RadGraph relation F1: `0.0000`
 - RadGraph available: `True`
 - RadGraph error: `None`
 
@@ -211,7 +211,7 @@ Frontal-only evaluation using `PA/AP` studies only. Number of evaluated studies:
 
 | Metric | Value |
 | --- | --- |
-| RadGraph F1 | `0.0754` |
-| CheXpert F1 micro | `0.1121` |
-| CheXpert F1 macro | `0.0747` |
+| RadGraph F1 | `0.0000` |
+| CheXpert F1 micro | `0.0000` |
+| CheXpert F1 macro | `0.0000` |
 <!-- MIMIC_TEST_RESULTS_END -->

@@ -39,6 +39,24 @@ Environment
   --output-dir artifacts\full_train_3epochs
 
 
+2a. Current full training command for the main run
+.\venv310\Scripts\python scripts\train.py `
+  --run-name full_3_epoch_mask_run `
+  --dataset combined `
+  --epochs 3 `
+  --duration 30m `
+  --batch-size 2 `
+  --global-batch-size 8 `
+  --eval-batch-size 1 `
+  --image-size 512 `
+  --device cuda `
+  --output-dir artifacts\full_3_epoch_mask_run `
+  --method lora_adamw `
+  --push-to-hub `
+  --repo-id manu02/LAnA `
+  --log-level INFO
+
+
 2b. Use gradient accumulation with a larger effective global batch
 Example: local batch size 2 on GPU, effective global batch size 8
 
@@ -126,6 +144,16 @@ Use the same output directory again:
 Notes:
 - If --push-to-hub is enabled, a duration-ended run will push the latest exported model and model card.
 - If you stop the run with Ctrl+C and --push-to-hub is enabled, the script saves a checkpoint/export and then pushes the updated artifacts too.
+
+
+7b. Evaluate the current main run on MIMIC test and push metrics/card to Hugging Face
+.\venv310\Scripts\python scripts\evaluate.py `
+  --run-dir artifacts\full_3_epoch_mask_run `
+  --batch-size 8 `
+  --device cuda `
+  --repo-id manu02/LAnA `
+  --push-to-hub `
+  --log-level INFO
 
 
 8. Important notes
