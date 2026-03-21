@@ -11,7 +11,7 @@ def push_directory_to_hub(local_dir: str, repo_id: str, commit_message: str = "U
         repo_id=repo_id,
         folder_path=str(folder),
         commit_message=commit_message,
-        ignore_patterns=["checkpoints", "checkpoints/**"],
-        delete_patterns=["checkpoints", "checkpoints/**"],
+        ignore_patterns=["checkpoints", "checkpoints/**", "_autotune", "_autotune/**"],
+        delete_patterns=["checkpoints", "checkpoints/**", "_autotune", "_autotune/**"],
     )
     return f"https://huggingface.co/{repo_id}"

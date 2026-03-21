@@ -148,6 +148,7 @@ def benchmark_training(repo_root: Path, args, output_dir: Path) -> dict:
             summary = load_json(candidate_dir / "run_summary.json")
             result = {
                 **candidate,
+                "candidate_dir": str(candidate_dir),
                 "status": "ok",
                 "elapsed_seconds": elapsed,
                 "images_per_second": float(summary.get("images_per_second", 0.0)),
@@ -165,14 +166,14 @@ def benchmark_training(repo_root: Path, args, output_dir: Path) -> dict:
     return {"results": results, "best": best}
 
 
-def benchmark_evaluation(repo_root: Path, args, output_dir: Path) -> dict:
+def benchmark_evaluation(repo_root: Path, args, eval_run_dir: Path) -> dict:
     results = []
     for batch_size in DEFAULT_EVAL_BATCH_CANDIDATES:
         command = [
             args.python_executable,
             "scripts/evaluate.py",
             "--run-dir",
-            str(output_dir),
+            str(eval_run_dir),
             "--batch-size",
             str(batch_size),
             "--device",
@@ -215,6 +216,7 @@ def resolve_autotuned_config(repo_root: Path, args, output_dir: Path) -> dict:
     LOGGER.info("Autotune config not found or rebenchmark requested. Running train/eval benchmarks.")
     train_benchmark = benchmark_training(repo_root, args, output_dir)
     best_train = train_benchmark["best"]
+    best_train_dir = Path(best_train["candidate_dir"])
     original_method = args.method
     original_batch_size = args.batch_size
     original_global_batch_size = args.global_batch_size
@@ -222,7 +224,7 @@ def resolve_autotuned_config(repo_root: Path, args, output_dir: Path) -> dict:
     args.method = best_train["method"]
     args.batch_size = int(best_train["batch_size"])
     args.global_batch_size = int(best_train["global_batch_size"])
-    eval_benchmark = benchmark_evaluation(repo_root, args, output_dir)
+    eval_benchmark = benchmark_evaluation(repo_root, args, best_train_dir)
     best_eval = eval_benchmark["best"]
 
     args.method = original_method

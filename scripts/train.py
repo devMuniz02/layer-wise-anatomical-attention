@@ -560,6 +560,11 @@ def save_export(output_dir: Path, model, tokenizer, summary: dict, args, benchma
         source_path = Path(source)
         if source_path.exists():
             shutil.copy2(source_path, segmenter_dir / target_name)
+    gif_source = Path("assets") / "AnatomicalAttention.gif"
+    if gif_source.exists():
+        asset_dir = output_dir / "assets"
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(gif_source, asset_dir / "AnatomicalAttention.gif")
     save_json(output_dir / "benchmark_results.json", {"results": benchmark_results})
     save_json(output_dir / "run_summary.json", summary)
 
