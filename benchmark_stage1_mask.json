@@ -1,0 +1,86 @@
+[
+  {
+    "method": "qlora_paged_adamw8bit",
+    "local_batch_size": 1,
+    "global_batch_size": 1,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "qlora_paged_adamw8bit",
+    "local_batch_size": 2,
+    "global_batch_size": 2,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "qlora_paged_adamw8bit",
+    "local_batch_size": 4,
+    "global_batch_size": 4,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "lora_adamw",
+    "local_batch_size": 1,
+    "global_batch_size": 1,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "lora_adamw",
+    "local_batch_size": 2,
+    "global_batch_size": 2,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "lora_adamw",
+    "local_batch_size": 4,
+    "global_batch_size": 4,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam",
+    "local_batch_size": 1,
+    "global_batch_size": 1,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam",
+    "local_batch_size": 2,
+    "global_batch_size": 2,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam",
+    "local_batch_size": 4,
+    "global_batch_size": 4,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam8bit",
+    "local_batch_size": 1,
+    "global_batch_size": 1,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam8bit",
+    "local_batch_size": 2,
+    "global_batch_size": 2,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  },
+  {
+    "method": "full_adam8bit",
+    "local_batch_size": 4,
+    "global_batch_size": 4,
+    "status": "failed",
+    "error": "GPT2Block.forward() got multiple values for argument 'encoder_attention_mask'"
+  }
+]

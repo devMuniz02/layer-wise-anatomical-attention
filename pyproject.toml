@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lana-radgen"
+version = "0.1.0"
+description = "Layer-Wise Anatomical Attention for chest X-ray report generation"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+  "torch",
+  "torchvision",
+  "transformers>=4.45.0",
+  "huggingface-hub>=0.24.0",
+  "pandas>=2.0.0",
+  "pillow>=10.0.0",
+  "numpy>=1.26.0",
+  "wandb>=0.17.0",
+  "pyyaml>=6.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
