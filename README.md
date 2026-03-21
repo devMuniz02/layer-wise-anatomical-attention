@@ -34,7 +34,7 @@ metrics:
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `8.12%` (`0.244` / `3` epochs)
+- Training completion toward planned run: `12.32%` (`0.370` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Overview
@@ -75,13 +75,13 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 - Scheduler: `cosine`
 - Warmup steps: `5114`
 - Weight decay: `0.01`
-- Steps completed: `8302`
+- Steps completed: `12603`
 - Planned total steps: `102276`
-- Images seen: `66424`
-- Total training time: `2.1667` hours
+- Images seen: `100839`
+- Total training time: `3.1667` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `2.7089`
-- Validation loss: `2.0830`
+- Final train loss: `2.3719`
+- Validation loss: `1.8726`
 
 ## MIMIC Test Results
 
@@ -191,11 +191,11 @@ print(report)
 - Dataset: `MIMIC-CXR test`
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
-- CheXpert F1 micro: `0.1901`
-- CheXpert F1 macro: `0.0968`
-- RadGraph F1: `0.0924`
-- RadGraph entity F1: `0.1506`
-- RadGraph relation F1: `0.1320`
+- CheXpert F1 micro: `0.0433`
+- CheXpert F1 macro: `0.0312`
+- RadGraph F1: `0.0248`
+- RadGraph entity F1: `0.0373`
+- RadGraph relation F1: `0.0322`
 - RadGraph available: `True`
 - RadGraph error: `None`
 
@@ -210,7 +210,7 @@ Frontal-only evaluation using `PA/AP` studies only. Number of evaluated studies:
 
 | Metric | Value |
 | --- | --- |
-| RadGraph F1 | `0.0924` |
-| CheXpert F1 micro | `0.1901` |
-| CheXpert F1 macro | `0.0968` |
+| RadGraph F1 | `0.0248` |
+| CheXpert F1 micro | `0.0433` |
+| CheXpert F1 macro | `0.0312` |
 <!-- MIMIC_TEST_RESULTS_END -->
