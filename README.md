@@ -96,35 +96,42 @@ Frontal-only evaluation using `PA/AP` studies only.
 
 ## Inference
 
-### Option 1: Local `lana_radgen` package
-
-Warning: this path only works if the repository code is available in your runtime environment.
-In practice, run it from the project root or install the package so `lana_radgen` is importable.
+Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
+Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
 
 ```python
 from pathlib import Path
+import sys
 
-import torch
 import numpy as np
+import torch
 from PIL import Image
-from huggingface_hub import hf_hub_download
+from huggingface_hub import snapshot_download
+from safetensors.torch import load_file
+from transformers import AutoTokenizer
 
-from lana_radgen import LanaForConditionalGeneration
+repo_dir = Path(snapshot_download("manu02/LAnA"))
+sys.path.insert(0, str(repo_dir))
 
-repo_id = "manu02/LAnA"
+from lana_radgen import LanaConfig, LanaForConditionalGeneration
+
+config = LanaConfig.from_pretrained(repo_dir)
+config.lung_segmenter_checkpoint = str(repo_dir / "segmenters" / "lung_segmenter_dinounet_finetuned.pth")
+config.heart_segmenter_checkpoint = str(repo_dir / "segmenters" / "heart_segmenter_dinounet_best.pth")
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = LanaForConditionalGeneration.from_pretrained(repo_id).to(device)
-model.eval()
+model = LanaForConditionalGeneration(config)
+state_dict = load_file(str(repo_dir / "model.safetensors"))
+missing, unexpected = model.load_state_dict(state_dict, strict=True)
+assert not missing and not unexpected
 
-lung_ckpt = hf_hub_download(repo_id=repo_id, filename="segmenters/lung_segmenter_dinounet_finetuned.pth")
-heart_ckpt = hf_hub_download(repo_id=repo_id, filename="segmenters/heart_segmenter_dinounet_best.pth")
-print(lung_ckpt, heart_ckpt)
+model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
+model.move_non_quantized_modules(device)
+model.eval()
 
 image_path = Path("example.png")
 image = Image.open(image_path).convert("RGB")
-
-# If the input image is not already 512x512, resize it before inference.
 image = image.resize((512, 512), resample=Image.BICUBIC)
 array = np.asarray(image, dtype=np.float32) / 255.0
 pixel_values = torch.from_numpy(array).permute(2, 0, 1)
@@ -136,47 +143,6 @@ with torch.no_grad():
     generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
 
 report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
-print(report)
-```
-
-### Option 2: Hugging Face `AutoModel` with remote code
-
-Use this if you do not want to import `lana_radgen` locally.
-Because LAnA has custom architecture code, this path requires `trust_remote_code=True`.
-
-```python
-from pathlib import Path
-
-import numpy as np
-import torch
-from PIL import Image
-from huggingface_hub import hf_hub_download
-from transformers import AutoModel, AutoTokenizer
-
-repo_id = "manu02/LAnA"
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-model = AutoModel.from_pretrained(repo_id, trust_remote_code=True).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
-model.eval()
-
-lung_ckpt = hf_hub_download(repo_id=repo_id, filename="segmenters/lung_segmenter_dinounet_finetuned.pth")
-heart_ckpt = hf_hub_download(repo_id=repo_id, filename="segmenters/heart_segmenter_dinounet_best.pth")
-print(lung_ckpt, heart_ckpt)
-
-image_path = Path("example.png")
-image = Image.open(image_path).convert("RGB")
-image = image.resize((512, 512), resample=Image.BICUBIC)
-array = np.asarray(image, dtype=np.float32) / 255.0
-pixel_values = torch.from_numpy(array).permute(2, 0, 1)
-mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
-
-with torch.no_grad():
-    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
-
-report = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 print(report)
 ```
 

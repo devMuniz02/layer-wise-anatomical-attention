@@ -1,4 +1,5 @@
 import argparse
+import copy
 import gc
 import json
 import logging
@@ -9,6 +10,7 @@ import re
 import shutil
 import time
 import zipfile
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -295,7 +297,15 @@ def collate_batch(batch, pad_token_id: int):
 
 
 def make_dataloader(manifest, tokenizer, batch_size: int, image_size: int, num_workers: int, shuffle: bool, seed: int):
-    dataset = ResizeCachedReportDataset(manifest=manifest, tokenizer=tokenizer, image_size=image_size)
+    max_text_length = getattr(tokenizer, "model_max_length", None)
+    if isinstance(max_text_length, int) and max_text_length > 100000:
+        max_text_length = 1024
+    dataset = ResizeCachedReportDataset(
+        manifest=manifest,
+        tokenizer=tokenizer,
+        image_size=image_size,
+        max_text_length=max_text_length,
+    )
     sampler = StatefulShuffleSampler(len(dataset), seed=seed) if shuffle else None
     loader = DataLoader(
         dataset,
@@ -549,7 +559,18 @@ def prune_old_checkpoints(root: Path, keep_last_n: int) -> None:
 
 
 def save_export(output_dir: Path, model, tokenizer, summary: dict, args, benchmark_results: list[dict]) -> None:
-    model.save_pretrained(output_dir / "model")
+    export_state_dict = model.state_dict()
+    if hasattr(model.text_decoder, "merge_and_unload"):
+        LOGGER.info("Merging LoRA decoder into a standalone decoder for export.")
+        merged_decoder = copy.deepcopy(model.text_decoder).cpu().merge_and_unload()
+        export_state_dict = OrderedDict(
+            (name, tensor.detach().cpu()) for name, tensor in model.state_dict().items() if not name.startswith("text_decoder.")
+        )
+        for name, tensor in merged_decoder.state_dict().items():
+            export_state_dict[f"text_decoder.{name}"] = tensor.detach().cpu()
+    if "text_decoder.lm_head.weight" in export_state_dict:
+        export_state_dict["text_decoder.lm_head.weight"] = export_state_dict["text_decoder.lm_head.weight"].clone()
+    model.save_pretrained(output_dir / "model", state_dict=export_state_dict)
     tokenizer.save_pretrained(output_dir / "tokenizer")
     segmenter_dir = output_dir / "segmenters"
     segmenter_dir.mkdir(parents=True, exist_ok=True)
@@ -1043,35 +1064,43 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
         "",
         "## Inference",
         "",
-        "### Option 1: Local `lana_radgen` package",
+        "Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.",
+        "Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.",
         "",
-        "Warning: this path only works if the repository code is available in your runtime environment.",
-        "In practice, run it from the project root or install the package so `lana_radgen` is importable.",
         "",
         "```python",
         "from pathlib import Path",
+        "import sys",
         "",
-        "import torch",
         "import numpy as np",
+        "import torch",
         "from PIL import Image",
-        "from huggingface_hub import hf_hub_download",
+        "from huggingface_hub import snapshot_download",
+        "from safetensors.torch import load_file",
+        "from transformers import AutoTokenizer",
         "",
-        "from lana_radgen import LanaForConditionalGeneration",
+        "repo_dir = Path(snapshot_download(\"manu02/LAnA\"))",
+        "sys.path.insert(0, str(repo_dir))",
         "",
-        "repo_id = \"manu02/LAnA\"",
+        "from lana_radgen import LanaConfig, LanaForConditionalGeneration",
+        "",
+        "config = LanaConfig.from_pretrained(repo_dir)",
+        "config.lung_segmenter_checkpoint = str(repo_dir / \"segmenters\" / \"lung_segmenter_dinounet_finetuned.pth\")",
+        "config.heart_segmenter_checkpoint = str(repo_dir / \"segmenters\" / \"heart_segmenter_dinounet_best.pth\")",
+        "",
         "device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")",
         "",
-        "model = LanaForConditionalGeneration.from_pretrained(repo_id).to(device)",
-        "model.eval()",
+        "model = LanaForConditionalGeneration(config)",
+        "state_dict = load_file(str(repo_dir / \"model.safetensors\"))",
+        "missing, unexpected = model.load_state_dict(state_dict, strict=True)",
+        "assert not missing and not unexpected",
         "",
-        "lung_ckpt = hf_hub_download(repo_id=repo_id, filename=\"segmenters/lung_segmenter_dinounet_finetuned.pth\")",
-        "heart_ckpt = hf_hub_download(repo_id=repo_id, filename=\"segmenters/heart_segmenter_dinounet_best.pth\")",
-        "print(lung_ckpt, heart_ckpt)",
+        "model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)",
+        "model.move_non_quantized_modules(device)",
+        "model.eval()",
         "",
         "image_path = Path(\"example.png\")",
         "image = Image.open(image_path).convert(\"RGB\")",
-        "",
-        "# If the input image is not already 512x512, resize it before inference.",
         "image = image.resize((512, 512), resample=Image.BICUBIC)",
         "array = np.asarray(image, dtype=np.float32) / 255.0",
         "pixel_values = torch.from_numpy(array).permute(2, 0, 1)",
@@ -1083,47 +1112,6 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
         "    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)",
         "",
         "report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]",
-        "print(report)",
-        "```",
-        "",
-        "### Option 2: Hugging Face `AutoModel` with remote code",
-        "",
-        "Use this if you do not want to import `lana_radgen` locally.",
-        "Because LAnA has custom architecture code, this path requires `trust_remote_code=True`.",
-        "",
-        "```python",
-        "from pathlib import Path",
-        "",
-        "import numpy as np",
-        "import torch",
-        "from PIL import Image",
-        "from huggingface_hub import hf_hub_download",
-        "from transformers import AutoModel, AutoTokenizer",
-        "",
-        "repo_id = \"manu02/LAnA\"",
-        "device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")",
-        "",
-        "model = AutoModel.from_pretrained(repo_id, trust_remote_code=True).to(device)",
-        "tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)",
-        "model.eval()",
-        "",
-        "lung_ckpt = hf_hub_download(repo_id=repo_id, filename=\"segmenters/lung_segmenter_dinounet_finetuned.pth\")",
-        "heart_ckpt = hf_hub_download(repo_id=repo_id, filename=\"segmenters/heart_segmenter_dinounet_best.pth\")",
-        "print(lung_ckpt, heart_ckpt)",
-        "",
-        "image_path = Path(\"example.png\")",
-        "image = Image.open(image_path).convert(\"RGB\")",
-        "image = image.resize((512, 512), resample=Image.BICUBIC)",
-        "array = np.asarray(image, dtype=np.float32) / 255.0",
-        "pixel_values = torch.from_numpy(array).permute(2, 0, 1)",
-        "mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)",
-        "std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)",
-        "pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)",
-        "",
-        "with torch.no_grad():",
-        "    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)",
-        "",
-        "report = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]",
         "print(report)",
         "```",
         "",
