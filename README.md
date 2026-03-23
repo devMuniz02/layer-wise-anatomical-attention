@@ -43,6 +43,10 @@ LAnA is a medical report-generation project for chest X-ray images. The complete
 
 The architecture combines a DINOv3 vision encoder, lung and heart segmentation heads, and a GPT-2 decoder modified so each transformer layer receives a different anatomical attention bias derived from the segmentation mask.
 
+## How to Run
+
+For local inference instructions, go to the [Inference](#inference) section.
+
 ## Intended Use
 
 - Input: a chest X-ray image resized to `512x512` and normalized with ImageNet mean/std.
@@ -59,7 +63,7 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 ## Evaluation
 
 - Text-generation metrics used in this project include BLEU, METEOR, ROUGE, and CIDEr.
-- Medical report metrics implemented in the repository include RadGraph F1 and CheXpert F1.
+- Medical report metrics implemented in the repository include RadGraph F1 and CheXpert F1 (`14-micro`, `5-micro`, `14-macro`, `5-macro`).
 
 ## Training Snapshot
 
@@ -87,12 +91,33 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 
 Frontal-only evaluation using `PA/AP` studies only.
 
+### Current Checkpoint Results
+
+| Metric | Value |
+| --- | --- |
+| Number of studies | `3041` |
+| RadGraph F1 | `0.0956` |
+| RadGraph entity F1 | `0.1582` |
+| RadGraph relation F1 | `0.1381` |
+| CheXpert F1 14-micro | `0.2322` |
+| CheXpert F1 5-micro | `0.2397` |
+| CheXpert F1 14-macro | `0.1152` |
+| CheXpert F1 5-macro | `0.1590` |
+
+### Final Completed Training Results
+
+The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.
+
 | Metric | Value |
 | --- | --- |
 | Number of studies | TBD |
 | RadGraph F1 | TBD |
-| CheXpert F1 micro | TBD |
-| CheXpert F1 macro | TBD |
+| RadGraph entity F1 | TBD |
+| RadGraph relation F1 | TBD |
+| CheXpert F1 14-micro | TBD |
+| CheXpert F1 5-micro | TBD |
+| CheXpert F1 14-macro | TBD |
+| CheXpert F1 5-macro | TBD |
 
 ## Inference
 
@@ -157,8 +182,10 @@ print(report)
 - Dataset: `MIMIC-CXR test`
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
-- CheXpert F1 micro: `0.1610`
-- CheXpert F1 macro: `0.1124`
+- CheXpert F1 14-micro: `0.2322`
+- CheXpert F1 5-micro: `0.2397`
+- CheXpert F1 14-macro: `0.1152`
+- CheXpert F1 5-macro: `0.1590`
 - RadGraph F1: `0.0956`
 - RadGraph entity F1: `0.1582`
 - RadGraph relation F1: `0.1381`
@@ -168,15 +195,3 @@ print(report)
 - Evaluation file: `evaluations/mimic_test_metrics.json`
 - Predictions file: `evaluations/mimic_test_predictions.csv`
 <!-- EVAL_RESULTS_END -->
-
-<!-- MIMIC_TEST_RESULTS_START -->
-## MIMIC Test Results
-
-Frontal-only evaluation using `PA/AP` studies only. Number of evaluated studies: `3041`.
-
-| Metric | Value |
-| --- | --- |
-| RadGraph F1 | `0.0956` |
-| CheXpert F1 micro | `0.1610` |
-| CheXpert F1 macro | `0.1124` |
-<!-- MIMIC_TEST_RESULTS_END -->

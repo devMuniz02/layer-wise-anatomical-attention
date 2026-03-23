@@ -21,13 +21,19 @@ from lana_radgen.metrics import chexpert_label_f1_from_reference_labels, radgrap
 LOGGER = logging.getLogger("evaluate")
 
 CHEXPERT_LABEL_COLUMNS = [
-    "Atelectasis",
+    "Enlarged Cardiomediastinum",
     "Cardiomegaly",
-    "Consolidation",
+    "Lung Opacity",
+    "Lung Lesion",
     "Edema",
-    "Pleural Effusion",
+    "Atelectasis",
+    "Consolidation",
     "Pneumonia",
     "Pneumothorax",
+    "Pleural Effusion",
+    "Pleural Other",
+    "Fracture",
+    "Support Devices",
     "No Finding",
 ]
 
@@ -51,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--limit", type=int, default=0, help="Optional cap on number of test examples.")
     parser.add_argument("--mimic-root", default="Datasets/MIMIC")
+    parser.add_argument("--predictions-csv", default="", help="Optional existing predictions CSV to recompute metrics without running generation.")
     parser.add_argument("--push-to-hub", action="store_true")
     parser.add_argument("--log-level", default="INFO")
     return parser
@@ -131,6 +138,13 @@ def _build_mimic_test_manifest(mimic_root: Path, limit: int = 0) -> pd.DataFrame
     if df.empty:
         raise RuntimeError("No usable MIMIC test examples were found after joins and file checks.")
     return df.reset_index(drop=True)
+
+
+def _load_chexpert_reference_labels(mimic_root: Path) -> pd.DataFrame:
+    chexpert_df = pd.read_csv(mimic_root / "mimic-cxr-2.0.0-chexpert.csv.gz", compression="gzip")
+    for label in CHEXPERT_LABEL_COLUMNS:
+        chexpert_df[label] = chexpert_df[label].fillna(0.0).map(lambda value: 1 if float(value) == 1.0 else 0)
+    return chexpert_df[["subject_id", "study_id"] + CHEXPERT_LABEL_COLUMNS].drop_duplicates(subset=["subject_id", "study_id"], keep="first")
 
 
 def _load_image_tensor(path: Path, image_size: int) -> torch.Tensor:
@@ -261,6 +275,46 @@ def _evaluate_model(
     return records, metrics
 
 
+def _evaluate_saved_predictions(predictions_path: Path, mimic_root: Path) -> tuple[list[dict], dict]:
+    records_df = pd.read_csv(predictions_path)
+    missing_label_columns = [label for label in CHEXPERT_LABEL_COLUMNS if label not in records_df.columns]
+    if missing_label_columns:
+        chexpert_df = _load_chexpert_reference_labels(mimic_root)
+        records_df = records_df.merge(chexpert_df, on=["subject_id", "study_id"], how="left")
+    if records_df[CHEXPERT_LABEL_COLUMNS].isnull().any().any():
+        missing = records_df[records_df[CHEXPERT_LABEL_COLUMNS].isnull().any(axis=1)][["subject_id", "study_id"]].drop_duplicates()
+        raise RuntimeError(f"Missing CheXpert labels for {len(missing)} prediction rows.")
+
+    predictions = records_df["prediction"].fillna("").astype(str).tolist()
+    references = records_df["reference"].fillna("").astype(str).tolist()
+    reference_labels = []
+    for _, row in records_df.iterrows():
+        reference_labels.append({label: int(row[label]) for label in CHEXPERT_LABEL_COLUMNS})
+
+    chexpert_metrics = chexpert_label_f1_from_reference_labels(predictions, reference_labels)
+    radgraph_metrics = radgraph_f1(predictions, references)
+    metrics = {
+        "split": "test",
+        "dataset": "mimic-cxr",
+        "view_filter": "frontal-only (PA/AP)",
+        "num_examples": len(records_df),
+        "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
+        "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
+        "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
+        "chexpert_f1_5_macro": chexpert_metrics["chexpert_f1_5_macro"],
+        "chexpert_f1_micro": chexpert_metrics["chexpert_f1_micro"],
+        "chexpert_f1_macro": chexpert_metrics["chexpert_f1_macro"],
+        "chexpert_per_label_f1": chexpert_metrics["chexpert_per_label_f1"],
+        "radgraph_f1": radgraph_metrics["radgraph_f1"],
+        "radgraph_f1_entity": radgraph_metrics["radgraph_f1_entity"],
+        "radgraph_f1_relation": radgraph_metrics["radgraph_f1_relation"],
+        "radgraph_available": radgraph_metrics["radgraph_available"],
+        "radgraph_error": radgraph_metrics["radgraph_error"],
+    }
+    records = records_df.to_dict(orient="records")
+    return records, metrics
+
+
 def _format_metric(value) -> str:
     if value is None:
         return "unavailable"
@@ -284,8 +338,10 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
             "- Dataset: `MIMIC-CXR test`",
             f"- View filter: `{metrics['view_filter']}`",
             f"- Number of examples: `{metrics['num_examples']}`",
-            f"- CheXpert F1 micro: `{_format_metric(metrics['chexpert_f1_micro'])}`",
-            f"- CheXpert F1 macro: `{_format_metric(metrics['chexpert_f1_macro'])}`",
+            f"- CheXpert F1 14-micro: `{_format_metric(metrics['chexpert_f1_14_micro'])}`",
+            f"- CheXpert F1 5-micro: `{_format_metric(metrics['chexpert_f1_5_micro'])}`",
+            f"- CheXpert F1 14-macro: `{_format_metric(metrics['chexpert_f1_14_macro'])}`",
+            f"- CheXpert F1 5-macro: `{_format_metric(metrics['chexpert_f1_5_macro'])}`",
             f"- RadGraph F1: `{_format_metric(metrics['radgraph_f1'])}`",
             f"- RadGraph entity F1: `{_format_metric(metrics['radgraph_f1_entity'])}`",
             f"- RadGraph relation F1: `{_format_metric(metrics['radgraph_f1_relation'])}`",
@@ -300,17 +356,38 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
 
     mimic_results_section = "\n".join(
         [
-            MIMIC_RESULTS_START,
             "## MIMIC Test Results",
             "",
-            f"Frontal-only evaluation using `PA/AP` studies only. Number of evaluated studies: `{metrics['num_examples']}`.",
+            "Frontal-only evaluation using `PA/AP` studies only.",
+            "",
+            "### Current Checkpoint Results",
             "",
             "| Metric | Value |",
             "| --- | --- |",
+            f"| Number of studies | `{metrics['num_examples']}` |",
             f"| RadGraph F1 | `{_format_metric(metrics['radgraph_f1'])}` |",
-            f"| CheXpert F1 micro | `{_format_metric(metrics['chexpert_f1_micro'])}` |",
-            f"| CheXpert F1 macro | `{_format_metric(metrics['chexpert_f1_macro'])}` |",
-            MIMIC_RESULTS_END,
+            f"| RadGraph entity F1 | `{_format_metric(metrics['radgraph_f1_entity'])}` |",
+            f"| RadGraph relation F1 | `{_format_metric(metrics['radgraph_f1_relation'])}` |",
+            f"| CheXpert F1 14-micro | `{_format_metric(metrics['chexpert_f1_14_micro'])}` |",
+            f"| CheXpert F1 5-micro | `{_format_metric(metrics['chexpert_f1_5_micro'])}` |",
+            f"| CheXpert F1 14-macro | `{_format_metric(metrics['chexpert_f1_14_macro'])}` |",
+            f"| CheXpert F1 5-macro | `{_format_metric(metrics['chexpert_f1_5_macro'])}` |",
+            "",
+            "### Final Completed Training Results",
+            "",
+            "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
+            "",
+            "| Metric | Value |",
+            "| --- | --- |",
+            "| Number of studies | TBD |",
+            "| RadGraph F1 | TBD |",
+            "| RadGraph entity F1 | TBD |",
+            "| RadGraph relation F1 | TBD |",
+            "| CheXpert F1 14-micro | TBD |",
+            "| CheXpert F1 5-micro | TBD |",
+            "| CheXpert F1 14-macro | TBD |",
+            "| CheXpert F1 5-macro | TBD |",
+            "",
         ]
     )
 
@@ -320,12 +397,9 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
     else:
         updated = current.rstrip() + "\n\n" + evaluation_section + "\n"
 
-    legacy_pattern = re.compile(
-        r"## MIMIC Test Results\s+.*?\| CheXpert F1 \| TBD \|",
-        flags=re.DOTALL,
-    )
-    if legacy_pattern.search(updated):
-        updated = legacy_pattern.sub(mimic_results_section, updated)
+    top_level_mimic_pattern = re.compile(r"## MIMIC Test Results\s+.*?(?=\n## |\Z)", flags=re.DOTALL)
+    if top_level_mimic_pattern.search(updated):
+        updated = top_level_mimic_pattern.sub(mimic_results_section, updated, count=1)
     else:
         mimic_pattern = re.compile(re.escape(MIMIC_RESULTS_START) + r".*?" + re.escape(MIMIC_RESULTS_END), flags=re.DOTALL)
         if mimic_pattern.search(updated):
@@ -333,7 +407,24 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
         else:
             updated = updated.rstrip() + "\n\n" + mimic_results_section + "\n"
 
+    marker_block_pattern = re.compile(r"\n*" + re.escape(MIMIC_RESULTS_START) + r".*?" + re.escape(MIMIC_RESULTS_END) + r"\n*", flags=re.DOTALL)
+    updated = marker_block_pattern.sub("\n\n", updated)
+    updated = re.sub(r"\n{3,}", "\n\n", updated).rstrip() + "\n"
+
     readme_path.write_text(updated, encoding="utf-8")
+
+
+def _merge_existing_metrics(metrics_path: Path, metrics: dict) -> dict:
+    if not metrics_path.exists():
+        return metrics
+    existing = json.loads(metrics_path.read_text(encoding="utf-8"))
+    if not metrics.get("radgraph_available") and existing.get("radgraph_f1") is not None:
+        metrics["radgraph_f1"] = existing.get("radgraph_f1")
+        metrics["radgraph_f1_entity"] = existing.get("radgraph_f1_entity")
+        metrics["radgraph_f1_relation"] = existing.get("radgraph_f1_relation")
+        metrics["radgraph_available"] = existing.get("radgraph_available", False)
+        metrics["radgraph_error"] = existing.get("radgraph_error")
+    return metrics
 
 
 def main() -> None:
@@ -343,23 +434,29 @@ def main() -> None:
     run_dir = Path(args.run_dir) if args.run_dir else _latest_run_dir()
     mimic_root = Path(args.mimic_root)
     device = torch.device(args.device)
-    manifest = _build_mimic_test_manifest(mimic_root=mimic_root, limit=args.limit)
-    LOGGER.info("Evaluating run_dir=%s on %s MIMIC test studies", run_dir, len(manifest))
+    if args.predictions_csv:
+        predictions_path = Path(args.predictions_csv)
+        LOGGER.info("Recomputing evaluation metrics from saved predictions at %s", predictions_path)
+        records, metrics = _evaluate_saved_predictions(predictions_path=predictions_path, mimic_root=mimic_root)
+    else:
+        manifest = _build_mimic_test_manifest(mimic_root=mimic_root, limit=args.limit)
+        LOGGER.info("Evaluating run_dir=%s on %s MIMIC test studies", run_dir, len(manifest))
 
-    model = _load_model(run_dir=run_dir, device=device)
-    records, metrics = _evaluate_model(
-        model,
-        manifest,
-        device=device,
-        image_size=args.image_size,
-        max_new_tokens=args.max_new_tokens,
-        batch_size=args.batch_size,
-    )
+        model = _load_model(run_dir=run_dir, device=device)
+        records, metrics = _evaluate_model(
+            model,
+            manifest,
+            device=device,
+            image_size=args.image_size,
+            max_new_tokens=args.max_new_tokens,
+            batch_size=args.batch_size,
+        )
 
     evaluations_dir = run_dir / "evaluations"
     evaluations_dir.mkdir(parents=True, exist_ok=True)
     predictions_path = evaluations_dir / "mimic_test_predictions.csv"
     metrics_path = evaluations_dir / "mimic_test_metrics.json"
+    metrics = _merge_existing_metrics(metrics_path, metrics)
     pd.DataFrame(records).to_csv(predictions_path, index=False)
     metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 

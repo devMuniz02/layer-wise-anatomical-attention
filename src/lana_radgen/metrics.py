@@ -32,14 +32,74 @@ if not hasattr(BertTokenizer, "build_inputs_with_special_tokens"):  # pragma: no
     BertTokenizer.build_inputs_with_special_tokens = _compat_build_inputs_with_special_tokens
 
 
+CHEXPERT_14_LABELS = [
+    "Enlarged Cardiomediastinum",
+    "Cardiomegaly",
+    "Lung Opacity",
+    "Lung Lesion",
+    "Edema",
+    "Consolidation",
+    "Pneumonia",
+    "Atelectasis",
+    "Pneumothorax",
+    "Pleural Effusion",
+    "Pleural Other",
+    "Fracture",
+    "Support Devices",
+    "No Finding",
+]
+
+CHEXPERT_5_LABELS = [
+    "Atelectasis",
+    "Cardiomegaly",
+    "Consolidation",
+    "Edema",
+    "Pleural Effusion",
+]
+
 CHEXPERT_LABEL_PATTERNS = {
-    "Atelectasis": [r"\batelectasis\b", r"\bsubsegmental atelectatic\b"],
+    "Enlarged Cardiomediastinum": [
+        r"\benlarged cardiomediastinum\b",
+        r"\bcardiomediastinal silhouette is enlarged\b",
+        r"\bcardiomediastinal enlargement\b",
+        r"\bmediastinal widening\b",
+    ],
     "Cardiomegaly": [r"\bcardiomegaly\b", r"\benlarged cardiac silhouette\b", r"\bheart size is enlarged\b"],
-    "Consolidation": [r"\bconsolidation\b", r"\bairspace opacity\b"],
-    "Edema": [r"\bedema\b", r"\bpulmonary edema\b", r"\bvascular congestion\b"],
-    "Pleural Effusion": [r"\bpleural effusion\b", r"\beffusion\b"],
+    "Lung Opacity": [
+        r"\blung opacity\b",
+        r"\bairspace opacity\b",
+        r"\bairspace opacities\b",
+        r"\bopacity in the (?:right|left|upper|lower|mid)\b",
+        r"\bopacification\b",
+        r"\bpatchy opacity\b",
+        r"\bpatchy opacities\b",
+        r"\bfocal opacity\b",
+    ],
+    "Lung Lesion": [r"\blung lesion\b", r"\bpulmonary nodule\b", r"\bpulmonary mass\b", r"\blung mass\b", r"\blung nodule\b"],
+    "Edema": [r"\bedema\b", r"\bpulmonary edema\b", r"\bvascular congestion\b", r"\binterstitial edema\b"],
+    "Consolidation": [r"\bconsolidation\b", r"\bconsolidative\b"],
     "Pneumonia": [r"\bpneumonia\b", r"\binfectious infiltrate\b"],
+    "Atelectasis": [r"\batelectasis\b", r"\bsubsegmental atelectatic\b", r"\bplate-like atelectatic\b"],
     "Pneumothorax": [r"\bpneumothorax\b"],
+    "Pleural Effusion": [r"\bpleural effusion\b", r"\bpleural effusions\b", r"\beffusion\b"],
+    "Pleural Other": [r"\bpleural thickening\b", r"\bpleural plaques?\b", r"\bpleural abnormality\b"],
+    "Fracture": [r"\bfracture\b", r"\bfractures\b", r"\bfractured\b"],
+    "Support Devices": [
+        r"\bsupport devices?\b",
+        r"\bpacemaker\b",
+        r"\bpicc\b",
+        r"\bport-a-cath\b",
+        r"\bportacath\b",
+        r"\bendotracheal tube\b",
+        r"\bet tube\b",
+        r"\benteric tube\b",
+        r"\bng tube\b",
+        r"\bchest tube\b",
+        r"\bcentral venous catheter\b",
+        r"\bcatheter tip\b",
+        r"\bline tip\b",
+        r"\bpostoperative changes\b",
+    ],
     "No Finding": [r"\bno acute cardiopulmonary abnormality\b", r"\bno acute disease\b", r"\bno focal airspace disease\b", r"\bno finding\b"],
 }
 
@@ -135,18 +195,15 @@ def _extract_chexpert_labels(report: str) -> set[str]:
     return labels
 
 
-def chexpert_label_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
-    label_names = list(CHEXPERT_LABEL_PATTERNS.keys())
+def _compute_chexpert_f1(predicted_labels_per_report: Sequence[set[str]], reference_labels: Sequence[Dict[str, int]], label_names: Sequence[str]) -> Dict[str, object]:
     tp = Counter()
     fp = Counter()
     fn = Counter()
 
-    for prediction, reference in zip(predictions, references):
-        pred_labels = _extract_chexpert_labels(prediction)
-        ref_labels = _extract_chexpert_labels(reference)
+    for pred_labels, ref_label_map in zip(predicted_labels_per_report, reference_labels):
         for label in label_names:
             in_pred = label in pred_labels
-            in_ref = label in ref_labels
+            in_ref = bool(ref_label_map.get(label, 0))
             if in_pred and in_ref:
                 tp[label] += 1
             elif in_pred and not in_ref:
@@ -169,53 +226,57 @@ def chexpert_label_f1(predictions: Sequence[str], references: Sequence[str]) -> 
     fn_total = sum(fn.values())
     micro_precision = tp_total / max(tp_total + fp_total, 1)
     micro_recall = tp_total / max(tp_total + fn_total, 1)
-    micro_f1 = 0.0 if micro_precision + micro_recall == 0 else 2 * micro_precision * micro_recall / (micro_precision + micro_recall)
-    macro_f1 = sum(per_label_f1.values()) / max(len(per_label_f1), 1)
+    micro_f1 = 0.0 if micro_precision + micro_recall == 0 else float(2 * micro_precision * micro_recall / (micro_precision + micro_recall))
+    macro_f1 = float(sum(per_label_f1.values()) / max(len(per_label_f1), 1))
 
     return {
-        "chexpert_f1_micro": float(micro_f1),
-        "chexpert_f1_macro": float(macro_f1),
+        "micro_f1": micro_f1,
+        "macro_f1": macro_f1,
         "chexpert_per_label_f1": per_label_f1,
-        "chexpert_label_names": label_names,
+        "chexpert_label_names": list(label_names),
+    }
+
+
+def _reference_label_maps_from_reports(references: Sequence[str]) -> List[Dict[str, int]]:
+    reference_label_maps = []
+    for reference in references:
+        ref_labels = _extract_chexpert_labels(reference)
+        reference_label_maps.append({label: int(label in ref_labels) for label in CHEXPERT_14_LABELS})
+    return reference_label_maps
+
+
+def chexpert_label_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
+    predicted_labels_per_report = [_extract_chexpert_labels(prediction) for prediction in predictions]
+    reference_label_maps = _reference_label_maps_from_reports(references)
+    chexpert_14 = _compute_chexpert_f1(predicted_labels_per_report, reference_label_maps, CHEXPERT_14_LABELS)
+    chexpert_5 = _compute_chexpert_f1(predicted_labels_per_report, reference_label_maps, CHEXPERT_5_LABELS)
+    return {
+        "chexpert_f1_14_micro": chexpert_14["micro_f1"],
+        "chexpert_f1_14_macro": chexpert_14["macro_f1"],
+        "chexpert_f1_5_micro": chexpert_5["micro_f1"],
+        "chexpert_f1_5_macro": chexpert_5["macro_f1"],
+        "chexpert_f1_micro": chexpert_14["micro_f1"],
+        "chexpert_f1_macro": chexpert_14["macro_f1"],
+        "chexpert_per_label_f1": chexpert_14["chexpert_per_label_f1"],
+        "chexpert_label_names": chexpert_14["chexpert_label_names"],
+        "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
     }
 
 
 def chexpert_label_f1_from_reference_labels(predictions: Sequence[str], reference_labels: Sequence[Dict[str, int]]) -> Dict[str, object]:
-    label_names = list(CHEXPERT_LABEL_PATTERNS.keys())
-    tp = Counter()
-    fp = Counter()
-    fn = Counter()
-
-    for prediction, ref_label_map in zip(predictions, reference_labels):
-        pred_labels = _extract_chexpert_labels(prediction)
-        for label in label_names:
-            in_pred = label in pred_labels
-            in_ref = bool(ref_label_map.get(label, 0))
-            if in_pred and in_ref:
-                tp[label] += 1
-            elif in_pred and not in_ref:
-                fp[label] += 1
-            elif in_ref and not in_pred:
-                fn[label] += 1
-
-    per_label_f1 = {}
-    for label in label_names:
-        precision = tp[label] / max(tp[label] + fp[label], 1)
-        recall = tp[label] / max(tp[label] + fn[label], 1)
-        per_label_f1[label] = 0.0 if precision + recall == 0 else float(2 * precision * recall / (precision + recall))
-
-    tp_total = sum(tp.values())
-    fp_total = sum(fp.values())
-    fn_total = sum(fn.values())
-    micro_precision = tp_total / max(tp_total + fp_total, 1)
-    micro_recall = tp_total / max(tp_total + fn_total, 1)
-    micro_f1 = 0.0 if micro_precision + micro_recall == 0 else float(2 * micro_precision * micro_recall / (micro_precision + micro_recall))
-    macro_f1 = float(sum(per_label_f1.values()) / max(len(per_label_f1), 1))
+    predicted_labels_per_report = [_extract_chexpert_labels(prediction) for prediction in predictions]
+    chexpert_14 = _compute_chexpert_f1(predicted_labels_per_report, reference_labels, CHEXPERT_14_LABELS)
+    chexpert_5 = _compute_chexpert_f1(predicted_labels_per_report, reference_labels, CHEXPERT_5_LABELS)
     return {
-        "chexpert_f1_micro": micro_f1,
-        "chexpert_f1_macro": macro_f1,
-        "chexpert_per_label_f1": per_label_f1,
-        "chexpert_label_names": label_names,
+        "chexpert_f1_14_micro": chexpert_14["micro_f1"],
+        "chexpert_f1_14_macro": chexpert_14["macro_f1"],
+        "chexpert_f1_5_micro": chexpert_5["micro_f1"],
+        "chexpert_f1_5_macro": chexpert_5["macro_f1"],
+        "chexpert_f1_micro": chexpert_14["micro_f1"],
+        "chexpert_f1_macro": chexpert_14["macro_f1"],
+        "chexpert_per_label_f1": chexpert_14["chexpert_per_label_f1"],
+        "chexpert_label_names": chexpert_14["chexpert_label_names"],
+        "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
     }
 
 
@@ -258,7 +319,7 @@ def summarize_text_metrics(metric_values: Dict[str, float]) -> Dict[str, float]:
 
 
 def default_metric_names() -> List[str]:
-    return ["bleu_4", "cider_d", "chexpert_f1_micro", "chexpert_f1_macro"]
+    return ["bleu_4", "cider_d", "chexpert_f1_14_micro", "chexpert_f1_5_micro", "chexpert_f1_14_macro", "chexpert_f1_5_macro"]
 
 
 def evaluate_report_generation(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
@@ -266,6 +327,10 @@ def evaluate_report_generation(predictions: Sequence[str], references: Sequence[
     metrics = {
         "bleu_4": corpus_bleu_4(predictions, references),
         "cider_d": cider_d(predictions, references),
+        "chexpert_f1_14_micro": chexpert["chexpert_f1_14_micro"],
+        "chexpert_f1_5_micro": chexpert["chexpert_f1_5_micro"],
+        "chexpert_f1_14_macro": chexpert["chexpert_f1_14_macro"],
+        "chexpert_f1_5_macro": chexpert["chexpert_f1_5_macro"],
         "chexpert_f1_micro": chexpert["chexpert_f1_micro"],
         "chexpert_f1_macro": chexpert["chexpert_f1_macro"],
         "num_examples": len(predictions),
