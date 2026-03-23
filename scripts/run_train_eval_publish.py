@@ -295,6 +295,7 @@ def main() -> None:
         args.repo_id,
         "--log-level",
         args.log_level,
+        "--disable-wandb",
     ]
     eval_cmd = [
         args.python_executable,

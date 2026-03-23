@@ -263,6 +263,10 @@ def _evaluate_model(
         "dataset": "mimic-cxr",
         "view_filter": "frontal-only (PA/AP)",
         "num_examples": len(records),
+        "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
+        "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
+        "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
+        "chexpert_f1_5_macro": chexpert_metrics["chexpert_f1_5_macro"],
         "chexpert_f1_micro": chexpert_metrics["chexpert_f1_micro"],
         "chexpert_f1_macro": chexpert_metrics["chexpert_f1_macro"],
         "chexpert_per_label_f1": chexpert_metrics["chexpert_per_label_f1"],
@@ -321,7 +325,6 @@ def _format_metric(value) -> str:
     if isinstance(value, float):
         return f"{value:.4f}"
     return str(value)
-
 
 def _update_model_card(run_dir: Path, metrics: dict) -> None:
     readme_path = run_dir / "README.md"

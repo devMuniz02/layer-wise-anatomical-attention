@@ -174,6 +174,9 @@ Notes:
   --git-branch main `
   --log-level INFO
 
+7d. Next pipeline command to run
+.\venv310\Scripts\python.exe scripts\run_train_eval_publish.py --run-name full_3_epoch_mask_run --dataset combined --epochs 3 --duration 1h --image-size 512 --device cuda --output-dir artifacts\full_3_epoch_mask_run --repo-id manu02/LAnA --git-remote origin --git-branch main --log-level INFO
+
 Notes:
 - On the first run, this script writes `artifacts\full_3_epoch_mask_run\pipeline_autotune.json`
 - Later runs reuse that saved fastest config automatically
