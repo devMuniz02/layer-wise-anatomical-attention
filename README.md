@@ -34,7 +34,7 @@ metrics:
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `44.27%` (`1.328` / `3` epochs)
+- Training completion toward planned run: `48.46%` (`1.454` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Overview
@@ -79,13 +79,13 @@ For local inference instructions, go to the [Inference](#inference) section.
 - Scheduler: `cosine`
 - Warmup steps: `5114`
 - Weight decay: `0.01`
-- Steps completed: `45269`
+- Steps completed: `49562`
 - Planned total steps: `102276`
-- Images seen: `362187`
-- Total training time: `10.6893` hours
+- Images seen: `396535`
+- Total training time: `11.6893` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.9292`
-- Validation loss: `1.4479`
+- Final train loss: `1.3791`
+- Validation loss: `1.4219`
 
 ## MIMIC Test Results
 
@@ -96,13 +96,13 @@ Frontal-only evaluation using `PA/AP` studies only.
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
-| RadGraph F1 | `0.1007` |
-| RadGraph entity F1 | `0.1623` |
-| RadGraph relation F1 | `0.1445` |
-| CheXpert F1 14-micro | `0.2889` |
-| CheXpert F1 5-micro | `0.3300` |
-| CheXpert F1 14-macro | `0.1519` |
-| CheXpert F1 5-macro | `0.2521` |
+| RadGraph F1 | `0.0966` |
+| RadGraph entity F1 | `0.1455` |
+| RadGraph relation F1 | `0.1320` |
+| CheXpert F1 14-micro | `0.2313` |
+| CheXpert F1 5-micro | `0.2747` |
+| CheXpert F1 14-macro | `0.1357` |
+| CheXpert F1 5-macro | `0.2098` |
 
 ### Final Completed Training Results
 
@@ -182,13 +182,13 @@ print(report)
 - Dataset: `MIMIC-CXR test`
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
-- CheXpert F1 14-micro: `0.2889`
-- CheXpert F1 5-micro: `0.3300`
-- CheXpert F1 14-macro: `0.1519`
-- CheXpert F1 5-macro: `0.2521`
-- RadGraph F1: `0.1007`
-- RadGraph entity F1: `0.1623`
-- RadGraph relation F1: `0.1445`
+- CheXpert F1 14-micro: `0.2313`
+- CheXpert F1 5-micro: `0.2747`
+- CheXpert F1 14-macro: `0.1357`
+- CheXpert F1 5-macro: `0.2098`
+- RadGraph F1: `0.0966`
+- RadGraph entity F1: `0.1455`
+- RadGraph relation F1: `0.1320`
 - RadGraph available: `True`
 - RadGraph error: `None`
 
