@@ -86,7 +86,7 @@ The final table will be populated when the planned training run is completed. Un
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `56.90%` (`1.707` / `3` epochs)
+- Training completion toward planned run: `60.87%` (`1.826` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Overview
@@ -131,10 +131,119 @@ For local inference instructions, go to the [Inference](#inference) section.
 - Scheduler: `cosine`
 - Warmup steps: `5114`
 - Weight decay: `0.01`
-- Steps completed: `58191`
+- Steps completed: `62245`
 - Planned total steps: `102276`
-- Images seen: `465570`
-- Total training time: `13.6893` hours
+- Images seen: `498009`
+- Total training time: `14.6893` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.4760`
-- Validation loss: `1.4079`
+- Final train loss: `1.8753`
+- Validation loss: `1.3978`
+
+## MIMIC Test Results
+
+Frontal-only evaluation using `PA/AP` studies only.
+
+### Current Checkpoint Results
+
+| Metric | Value |
+| --- | --- |
+| Number of studies | `3041` |
+| RadGraph F1 | `0.1011` |
+| RadGraph entity F1 | `0.1511` |
+| RadGraph relation F1 | `0.1365` |
+| CheXpert F1 14-micro | `0.2372` |
+| CheXpert F1 5-micro | `0.2767` |
+| CheXpert F1 14-macro | `0.1241` |
+| CheXpert F1 5-macro | `0.1744` |
+
+### Final Completed Training Results
+
+The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.
+
+| Metric | Value |
+| --- | --- |
+| Number of studies | TBD |
+| RadGraph F1 | TBD |
+| RadGraph entity F1 | TBD |
+| RadGraph relation F1 | TBD |
+| CheXpert F1 14-micro | TBD |
+| CheXpert F1 5-micro | TBD |
+| CheXpert F1 14-macro | TBD |
+| CheXpert F1 5-macro | TBD |
+
+## Inference
+
+Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
+Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
+
+```python
+from pathlib import Path
+import sys
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import snapshot_download
+from safetensors.torch import load_file
+from transformers import AutoTokenizer
+
+repo_dir = Path(snapshot_download("manu02/LAnA"))
+sys.path.insert(0, str(repo_dir))
+
+from lana_radgen import LanaConfig, LanaForConditionalGeneration
+
+config = LanaConfig.from_pretrained(repo_dir)
+config.lung_segmenter_checkpoint = str(repo_dir / "segmenters" / "lung_segmenter_dinounet_finetuned.pth")
+config.heart_segmenter_checkpoint = str(repo_dir / "segmenters" / "heart_segmenter_dinounet_best.pth")
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = LanaForConditionalGeneration(config)
+state_dict = load_file(str(repo_dir / "model.safetensors"))
+missing, unexpected = model.load_state_dict(state_dict, strict=True)
+assert not missing and not unexpected
+
+model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
+model.move_non_quantized_modules(device)
+model.eval()
+
+image_path = Path("example.png")
+image = Image.open(image_path).convert("RGB")
+image = image.resize((512, 512), resample=Image.BICUBIC)
+array = np.asarray(image, dtype=np.float32) / 255.0
+pixel_values = torch.from_numpy(array).permute(2, 0, 1)
+mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
+
+report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+print(report)
+```
+
+## Notes
+
+- `segmenters/` contains the lung and heart segmentation checkpoints used to build anatomical attention masks.
+- `evaluations/mimic_test_metrics.json` contains the latest saved MIMIC test metrics.
+
+<!-- EVAL_RESULTS_START -->
+## Latest Evaluation
+
+- Dataset: `MIMIC-CXR test`
+- View filter: `frontal-only (PA/AP)`
+- Number of examples: `3041`
+- CheXpert F1 14-micro: `0.2372`
+- CheXpert F1 5-micro: `0.2767`
+- CheXpert F1 14-macro: `0.1241`
+- CheXpert F1 5-macro: `0.1744`
+- RadGraph F1: `0.1011`
+- RadGraph entity F1: `0.1511`
+- RadGraph relation F1: `0.1365`
+- RadGraph available: `True`
+- RadGraph error: `None`
+
+- Evaluation file: `evaluations/mimic_test_metrics.json`
+- Predictions file: `evaluations/mimic_test_predictions.csv`
+<!-- EVAL_RESULTS_END -->
