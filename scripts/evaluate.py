@@ -378,6 +378,13 @@ def _results_table_lines(title: str, metrics: dict) -> list[str]:
     ]
 
 
+def _load_run_summary(run_dir: Path) -> dict:
+    summary_path = run_dir / "run_summary.json"
+    if not summary_path.exists():
+        return {}
+    return json.loads(summary_path.read_text(encoding="utf-8"))
+
+
 def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
     readme_path = run_dir / "README.md"
     if readme_path.exists():
@@ -385,8 +392,38 @@ def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
     else:
         current = f"# {run_dir.name}\n"
 
+    summary = _load_run_summary(run_dir)
+    run_completed = bool(summary.get("completed"))
     all_test_metrics = metrics_bundle[ALL_TEST_KEY]
     findings_metrics = metrics_bundle[FINDINGS_ONLY_TEST_KEY]
+
+    if run_completed:
+        final_completed_lines = [
+            "### Final Completed Training Results",
+            "",
+            "These final-report metrics correspond to the completed training run.",
+            "",
+            *_results_table_lines("All Frontal Test Studies", all_test_metrics),
+            *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
+        ]
+    else:
+        final_completed_lines = [
+            "### Final Completed Training Results",
+            "",
+            "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
+            "",
+            "| Metric | Value |",
+            "| --- | --- |",
+            "| Number of studies | TBD |",
+            "| RadGraph F1 | TBD |",
+            "| RadGraph entity F1 | TBD |",
+            "| RadGraph relation F1 | TBD |",
+            "| CheXpert F1 14-micro | TBD |",
+            "| CheXpert F1 5-micro | TBD |",
+            "| CheXpert F1 14-macro | TBD |",
+            "| CheXpert F1 5-macro | TBD |",
+            "",
+        ]
 
     evaluation_section = "\n".join(
         [
@@ -413,21 +450,7 @@ def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
             "",
             *_results_table_lines("All Frontal Test Studies", all_test_metrics),
             *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
-            "### Final Completed Training Results",
-            "",
-            "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
-            "",
-            "| Metric | Value |",
-            "| --- | --- |",
-            "| Number of studies | TBD |",
-            "| RadGraph F1 | TBD |",
-            "| RadGraph entity F1 | TBD |",
-            "| RadGraph relation F1 | TBD |",
-            "| CheXpert F1 14-micro | TBD |",
-            "| CheXpert F1 5-micro | TBD |",
-            "| CheXpert F1 14-macro | TBD |",
-            "| CheXpert F1 5-macro | TBD |",
-            "",
+            *final_completed_lines,
         ]
     )
 

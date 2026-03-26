@@ -121,18 +121,33 @@ Frontal-only evaluation using `PA/AP` studies only.
 
 ### Final Completed Training Results
 
-The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.
+These final-report metrics correspond to the completed training run.
+
+### All Frontal Test Studies
 
 | Metric | Value |
 | --- | --- |
-| Number of studies | TBD |
-| RadGraph F1 | TBD |
-| RadGraph entity F1 | TBD |
-| RadGraph relation F1 | TBD |
-| CheXpert F1 14-micro | TBD |
-| CheXpert F1 5-micro | TBD |
-| CheXpert F1 14-macro | TBD |
-| CheXpert F1 5-macro | TBD |
+| Number of studies | `3041` |
+| RadGraph F1 | `0.0918` |
+| RadGraph entity F1 | `0.1399` |
+| RadGraph relation F1 | `0.1246` |
+| CheXpert F1 14-micro | `0.1829` |
+| CheXpert F1 5-micro | `0.2183` |
+| CheXpert F1 14-macro | `0.1095` |
+| CheXpert F1 5-macro | `0.1634` |
+
+### Findings-Only Frontal Test Studies
+
+| Metric | Value |
+| --- | --- |
+| Number of studies | `2210` |
+| RadGraph F1 | `0.1010` |
+| RadGraph entity F1 | `0.1517` |
+| RadGraph relation F1 | `0.1347` |
+| CheXpert F1 14-micro | `0.1651` |
+| CheXpert F1 5-micro | `0.2152` |
+| CheXpert F1 14-macro | `0.1047` |
+| CheXpert F1 5-macro | `0.1611` |
 
 ## Inference
 
