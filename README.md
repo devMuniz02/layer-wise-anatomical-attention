@@ -45,7 +45,59 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 
 ## How to Run
 
-For local inference instructions, go to the [Inference](#inference) section.
+Use the local inference flow below to run the model from the exported checkpoint.
+
+### Inference
+
+Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
+Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
+
+```python
+from pathlib import Path
+import sys
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import snapshot_download
+from safetensors.torch import load_file
+from transformers import AutoTokenizer
+
+repo_dir = Path(snapshot_download("manu02/LAnA"))
+sys.path.insert(0, str(repo_dir))
+
+from lana_radgen import LanaConfig, LanaForConditionalGeneration
+
+config = LanaConfig.from_pretrained(repo_dir)
+config.lung_segmenter_checkpoint = str(repo_dir / "segmenters" / "lung_segmenter_dinounet_finetuned.pth")
+config.heart_segmenter_checkpoint = str(repo_dir / "segmenters" / "heart_segmenter_dinounet_best.pth")
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = LanaForConditionalGeneration(config)
+state_dict = load_file(str(repo_dir / "model.safetensors"))
+missing, unexpected = model.load_state_dict(state_dict, strict=True)
+assert not missing and not unexpected
+
+model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
+model.move_non_quantized_modules(device)
+model.eval()
+
+image_path = Path("example.png")
+image = Image.open(image_path).convert("RGB")
+image = image.resize((512, 512), resample=Image.BICUBIC)
+array = np.asarray(image, dtype=np.float32) / 255.0
+pixel_values = torch.from_numpy(array).permute(2, 0, 1)
+mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
+
+report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+print(report)
+```
 
 ## Intended Use
 
@@ -62,7 +114,6 @@ For local inference instructions, go to the [Inference](#inference) section.
 
 ## Evaluation
 
-- Text-generation metrics used in this project include BLEU, METEOR, ROUGE, and CIDEr.
 - Medical report metrics implemented in the repository include RadGraph F1 and CheXpert F1 (`14-micro`, `5-micro`, `14-macro`, `5-macro`).
 
 ## Training Snapshot
@@ -120,58 +171,6 @@ These final-report metrics correspond to the completed training run.
 | CheXpert F1 5-micro | `0.2152` |
 | CheXpert F1 14-macro | `0.1047` |
 | CheXpert F1 5-macro | `0.1611` |
-
-## Inference
-
-Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
-Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
-
-```python
-from pathlib import Path
-import sys
-
-import numpy as np
-import torch
-from PIL import Image
-from huggingface_hub import snapshot_download
-from safetensors.torch import load_file
-from transformers import AutoTokenizer
-
-repo_dir = Path(snapshot_download("manu02/LAnA"))
-sys.path.insert(0, str(repo_dir))
-
-from lana_radgen import LanaConfig, LanaForConditionalGeneration
-
-config = LanaConfig.from_pretrained(repo_dir)
-config.lung_segmenter_checkpoint = str(repo_dir / "segmenters" / "lung_segmenter_dinounet_finetuned.pth")
-config.heart_segmenter_checkpoint = str(repo_dir / "segmenters" / "heart_segmenter_dinounet_best.pth")
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-model = LanaForConditionalGeneration(config)
-state_dict = load_file(str(repo_dir / "model.safetensors"))
-missing, unexpected = model.load_state_dict(state_dict, strict=True)
-assert not missing and not unexpected
-
-model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
-model.move_non_quantized_modules(device)
-model.eval()
-
-image_path = Path("example.png")
-image = Image.open(image_path).convert("RGB")
-image = image.resize((512, 512), resample=Image.BICUBIC)
-array = np.asarray(image, dtype=np.float32) / 255.0
-pixel_values = torch.from_numpy(array).permute(2, 0, 1)
-mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
-
-with torch.no_grad():
-    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
-
-report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
-print(report)
-```
 
 ## Notes
 
