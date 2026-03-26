@@ -29,14 +29,6 @@ metrics:
 
 ![Layer-Wise Anatomical Attention](assets/AnatomicalAttention.gif)
 
-## Status
-
-- Project status: `Training completed`
-- Release status: `Completed training run`
-- Current checkpoint status: `Final completed run`
-- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
-- Current published metrics correspond to the completed training run.
-
 ## Overview
 
 LAnA is a medical report-generation project for chest X-ray images. The completed project is intended to generate radiology reports with a vision-language model guided by layer-wise anatomical attention built from predicted anatomical masks.
@@ -44,10 +36,6 @@ LAnA is a medical report-generation project for chest X-ray images. The complete
 The architecture combines a DINOv3 vision encoder, lung and heart segmentation heads, and a GPT-2 decoder modified so each transformer layer receives a different anatomical attention bias derived from the segmentation mask.
 
 ## How to Run
-
-Use the local inference flow below to run the model from the exported checkpoint.
-
-### Inference
 
 Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
 Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
@@ -105,39 +93,6 @@ print(report)
 - Output: a generated radiology report.
 - Best fit: research use, report-generation experiments, and anatomical-attention ablations.
 
-## Data
-
-- Full project datasets: CheXpert and MIMIC-CXR.
-- Intended project scope: train on curated chest X-ray/report data from both datasets and evaluate on MIMIC-CXR test studies.
-- Current released checkpoint datasets: `CheXpert, MIMIC-CXR` for training and `CheXpert, MIMIC-CXR` for validation.
-- Current published evaluation: MIMIC-CXR test split, `frontal-only (PA/AP)` studies.
-
-## Evaluation
-
-- Medical report metrics implemented in the repository include RadGraph F1 and CheXpert F1 (`14-micro`, `5-micro`, `14-macro`, `5-macro`).
-
-## Training Snapshot
-
-- Run: `full_3_epoch_mask_run`
-- This section describes the completed public training run.
-- Method: `lora_adamw`
-- Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
-- Text decoder: `gpt2`
-- Segmentation encoder: `facebook/dinov3-convnext-small-pretrain-lvd1689m`
-- Image size: `512`
-- Local batch size: `1`
-- Effective global batch size: `8`
-- Scheduler: `cosine`
-- Warmup steps: `5114`
-- Weight decay: `0.01`
-- Steps completed: `102264`
-- Planned total steps: `102276`
-- Images seen: `818196`
-- Total training time: `23.5798` hours
-- Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.1683`
-- Validation loss: `1.3692`
-
 ## MIMIC Test Results
 
 Frontal-only evaluation using `PA/AP` studies only.
@@ -171,6 +126,47 @@ These final-report metrics correspond to the completed training run.
 | CheXpert F1 5-micro | `0.2152` |
 | CheXpert F1 14-macro | `0.1047` |
 | CheXpert F1 5-macro | `0.1611` |
+
+## Data
+
+- Full project datasets: CheXpert and MIMIC-CXR.
+- Intended project scope: train on curated chest X-ray/report data from both datasets and evaluate on MIMIC-CXR test studies.
+- Current released checkpoint datasets: `CheXpert, MIMIC-CXR` for training and `CheXpert, MIMIC-CXR` for validation.
+- Current published evaluation: MIMIC-CXR test split, `frontal-only (PA/AP)` studies.
+
+## Evaluation
+
+- Medical report metrics implemented in the repository include RadGraph F1 and CheXpert F1 (`14-micro`, `5-micro`, `14-macro`, `5-macro`).
+
+## Training Snapshot
+
+- Run: `full_3_epoch_mask_run`
+- This section describes the completed public training run.
+- Method: `lora_adamw`
+- Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
+- Text decoder: `gpt2`
+- Segmentation encoder: `facebook/dinov3-convnext-small-pretrain-lvd1689m`
+- Image size: `512`
+- Local batch size: `1`
+- Effective global batch size: `8`
+- Scheduler: `cosine`
+- Warmup steps: `5114`
+- Weight decay: `0.01`
+- Steps completed: `102264`
+- Planned total steps: `102276`
+- Images seen: `818196`
+- Total training time: `23.5798` hours
+- Hardware: `NVIDIA GeForce RTX 5070`
+- Final train loss: `1.1683`
+- Validation loss: `1.3692`
+
+## Status
+
+- Project status: `Training completed`
+- Release status: `Completed training run`
+- Current checkpoint status: `Final completed run`
+- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
+- Current published metrics correspond to the completed training run.
 
 ## Notes
 
