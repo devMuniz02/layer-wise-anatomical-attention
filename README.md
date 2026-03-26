@@ -31,11 +31,11 @@ metrics:
 
 ## Status
 
-- Project status: `Training in progress`
-- Release status: `Research preview checkpoint`
-- Current checkpoint status: `Not final`
+- Project status: `Training completed`
+- Release status: `Completed training run`
+- Current checkpoint status: `Final completed run`
 - Training completion toward planned run: `100.00%` (`4.000` / `3` epochs)
-- Current published metrics are intermediate and will change as training continues.
+- Current published metrics correspond to the completed training run.
 
 ## Overview
 
@@ -68,7 +68,7 @@ For local inference instructions, go to the [Inference](#inference) section.
 ## Training Snapshot
 
 - Run: `full_3_epoch_mask_run`
-- This section describes the current public checkpoint, not the final completed project.
+- This section describes the completed public training run.
 - Method: `lora_adamw`
 - Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
 - Text decoder: `gpt2`
@@ -90,34 +90,6 @@ For local inference instructions, go to the [Inference](#inference) section.
 ## MIMIC Test Results
 
 Frontal-only evaluation using `PA/AP` studies only.
-
-### Current Checkpoint Results
-
-### All Frontal Test Studies
-
-| Metric | Value |
-| --- | --- |
-| Number of studies | `3041` |
-| RadGraph F1 | `0.0918` |
-| RadGraph entity F1 | `0.1399` |
-| RadGraph relation F1 | `0.1246` |
-| CheXpert F1 14-micro | `0.1829` |
-| CheXpert F1 5-micro | `0.2183` |
-| CheXpert F1 14-macro | `0.1095` |
-| CheXpert F1 5-macro | `0.1634` |
-
-### Findings-Only Frontal Test Studies
-
-| Metric | Value |
-| --- | --- |
-| Number of studies | `2210` |
-| RadGraph F1 | `0.1010` |
-| RadGraph entity F1 | `0.1517` |
-| RadGraph relation F1 | `0.1347` |
-| CheXpert F1 14-micro | `0.1651` |
-| CheXpert F1 5-micro | `0.2152` |
-| CheXpert F1 14-macro | `0.1047` |
-| CheXpert F1 5-macro | `0.1611` |
 
 ### Final Completed Training Results
 
@@ -205,40 +177,3 @@ print(report)
 
 - `segmenters/` contains the lung and heart segmentation checkpoints used to build anatomical attention masks.
 - `evaluations/mimic_test_metrics.json` contains the latest saved MIMIC test metrics.
-
-<!-- EVAL_RESULTS_START -->
-## Latest Evaluation
-
-- Dataset: `MIMIC-CXR test`
-### All Frontal Test Studies
-
-- View filter: `frontal-only (PA/AP)`
-- Number of examples: `3041`
-- CheXpert F1 14-micro: `0.1829`
-- CheXpert F1 5-micro: `0.2183`
-- CheXpert F1 14-macro: `0.1095`
-- CheXpert F1 5-macro: `0.1634`
-- RadGraph F1: `0.0918`
-- RadGraph entity F1: `0.1399`
-- RadGraph relation F1: `0.1246`
-- RadGraph available: `True`
-- RadGraph error: `None`
-
-### Findings-Only Frontal Test Studies
-
-- View filter: `frontal-only (PA/AP), structured Findings section only`
-- Number of examples: `2210`
-- CheXpert F1 14-micro: `0.1651`
-- CheXpert F1 5-micro: `0.2152`
-- CheXpert F1 14-macro: `0.1047`
-- CheXpert F1 5-macro: `0.1611`
-- RadGraph F1: `0.1010`
-- RadGraph entity F1: `0.1517`
-- RadGraph relation F1: `0.1347`
-- RadGraph available: `True`
-- RadGraph error: `None`
-
-- Evaluation file: `evaluations/mimic_test_metrics.json`
-- Predictions file: `evaluations/mimic_test_predictions.csv`
-- Findings-only predictions file: `evaluations/mimic_test_findings_only_predictions.csv`
-<!-- EVAL_RESULTS_END -->

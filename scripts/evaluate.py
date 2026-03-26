@@ -341,25 +341,6 @@ def _format_metric(value) -> str:
         return f"{value:.4f}"
     return str(value)
 
-def _metrics_block_lines(title: str, metrics: dict) -> list[str]:
-    return [
-        f"### {title}",
-        "",
-        f"- View filter: `{metrics['view_filter']}`",
-        f"- Number of examples: `{metrics['num_examples']}`",
-        f"- CheXpert F1 14-micro: `{_format_metric(metrics['chexpert_f1_14_micro'])}`",
-        f"- CheXpert F1 5-micro: `{_format_metric(metrics['chexpert_f1_5_micro'])}`",
-        f"- CheXpert F1 14-macro: `{_format_metric(metrics['chexpert_f1_14_macro'])}`",
-        f"- CheXpert F1 5-macro: `{_format_metric(metrics['chexpert_f1_5_macro'])}`",
-        f"- RadGraph F1: `{_format_metric(metrics['radgraph_f1'])}`",
-        f"- RadGraph entity F1: `{_format_metric(metrics['radgraph_f1_entity'])}`",
-        f"- RadGraph relation F1: `{_format_metric(metrics['radgraph_f1_relation'])}`",
-        f"- RadGraph available: `{metrics['radgraph_available']}`",
-        f"- RadGraph error: `{metrics['radgraph_error']}`",
-        "",
-    ]
-
-
 def _results_table_lines(title: str, metrics: dict) -> list[str]:
     return [
         f"### {title}",
@@ -398,67 +379,78 @@ def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
     findings_metrics = metrics_bundle[FINDINGS_ONLY_TEST_KEY]
 
     if run_completed:
-        final_completed_lines = [
-            "### Final Completed Training Results",
-            "",
-            "These final-report metrics correspond to the completed training run.",
-            "",
-            *_results_table_lines("All Frontal Test Studies", all_test_metrics),
-            *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
+        status_replacements = [
+            (
+                r"- Project status: `.*?`",
+                "- Project status: `Training completed`",
+            ),
+            (
+                r"- Release status: `.*?`",
+                "- Release status: `Completed training run`",
+            ),
+            (
+                r"- Current checkpoint status: `.*?`",
+                "- Current checkpoint status: `Final completed run`",
+            ),
+            (
+                r"- Current published metrics are .*",
+                "- Current published metrics correspond to the completed training run.",
+            ),
+            (
+                r"- This section describes the current public checkpoint, not the final completed project\.",
+                "- This section describes the completed public training run.",
+            ),
         ]
+        for pattern_text, replacement in status_replacements:
+            current = re.sub(pattern_text, replacement, current)
     else:
-        final_completed_lines = [
-            "### Final Completed Training Results",
-            "",
-            "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
-            "",
-            "| Metric | Value |",
-            "| --- | --- |",
-            "| Number of studies | TBD |",
-            "| RadGraph F1 | TBD |",
-            "| RadGraph entity F1 | TBD |",
-            "| RadGraph relation F1 | TBD |",
-            "| CheXpert F1 14-micro | TBD |",
-            "| CheXpert F1 5-micro | TBD |",
-            "| CheXpert F1 14-macro | TBD |",
-            "| CheXpert F1 5-macro | TBD |",
-            "",
-        ]
+        current = re.sub(r"- Project status: `.*?`", "- Project status: `Training in progress`", current)
 
-    evaluation_section = "\n".join(
-        [
-            README_EVAL_START,
-            "## Latest Evaluation",
-            "",
-            "- Dataset: `MIMIC-CXR test`",
-            *_metrics_block_lines("All Frontal Test Studies", all_test_metrics),
-            *_metrics_block_lines("Findings-Only Frontal Test Studies", findings_metrics),
-            "- Evaluation file: `evaluations/mimic_test_metrics.json`",
-            "- Predictions file: `evaluations/mimic_test_predictions.csv`",
-            "- Findings-only predictions file: `evaluations/mimic_test_findings_only_predictions.csv`",
-            README_EVAL_END,
-        ]
-    )
-
-    mimic_results_section = "\n".join(
-        [
-            "## MIMIC Test Results",
-            "",
-            "Frontal-only evaluation using `PA/AP` studies only.",
-            "",
-            "### Current Checkpoint Results",
-            "",
-            *_results_table_lines("All Frontal Test Studies", all_test_metrics),
-            *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
-            *final_completed_lines,
-        ]
-    )
-
-    pattern = re.compile(re.escape(README_EVAL_START) + r".*?" + re.escape(README_EVAL_END), flags=re.DOTALL)
-    if pattern.search(current):
-        updated = pattern.sub(evaluation_section, current)
+    if run_completed:
+        mimic_results_section = "\n".join(
+            [
+                "## MIMIC Test Results",
+                "",
+                "Frontal-only evaluation using `PA/AP` studies only.",
+                "",
+                "### Final Completed Training Results",
+                "",
+                "These final-report metrics correspond to the completed training run.",
+                "",
+                *_results_table_lines("All Frontal Test Studies", all_test_metrics),
+                *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
+            ]
+        )
     else:
-        updated = current.rstrip() + "\n\n" + evaluation_section + "\n"
+        mimic_results_section = "\n".join(
+            [
+                "## MIMIC Test Results",
+                "",
+                "Frontal-only evaluation using `PA/AP` studies only.",
+                "",
+                "### Current Checkpoint Results",
+                "",
+                *_results_table_lines("All Frontal Test Studies", all_test_metrics),
+                *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
+                "### Final Completed Training Results",
+                "",
+                "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
+                "",
+                "| Metric | Value |",
+                "| --- | --- |",
+                "| Number of studies | TBD |",
+                "| RadGraph F1 | TBD |",
+                "| RadGraph entity F1 | TBD |",
+                "| RadGraph relation F1 | TBD |",
+                "| CheXpert F1 14-micro | TBD |",
+                "| CheXpert F1 5-micro | TBD |",
+                "| CheXpert F1 14-macro | TBD |",
+                "| CheXpert F1 5-macro | TBD |",
+                "",
+            ]
+        )
+
+    updated = current
 
     top_level_mimic_pattern = re.compile(r"## MIMIC Test Results\s+.*?(?=\n## |\Z)", flags=re.DOTALL)
     if top_level_mimic_pattern.search(updated):
@@ -472,6 +464,8 @@ def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
 
     marker_block_pattern = re.compile(r"\n*" + re.escape(MIMIC_RESULTS_START) + r".*?" + re.escape(MIMIC_RESULTS_END) + r"\n*", flags=re.DOTALL)
     updated = marker_block_pattern.sub("\n\n", updated)
+    eval_block_pattern = re.compile(r"\n*" + re.escape(README_EVAL_START) + r".*?" + re.escape(README_EVAL_END) + r"\n*", flags=re.DOTALL)
+    updated = eval_block_pattern.sub("\n\n", updated)
     updated = re.sub(r"\n{3,}", "\n\n", updated).rstrip() + "\n"
 
     readme_path.write_text(updated, encoding="utf-8")
