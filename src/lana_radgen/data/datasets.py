@@ -1,10 +1,13 @@
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from torch.utils.data import Dataset
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -15,12 +18,23 @@ class ReportSample:
 
 
 class ResizeCachedReportDataset(Dataset):
-    def __init__(self, manifest, tokenizer, image_mean=None, image_std=None, image_size: Optional[int] = None):
+    def __init__(
+        self,
+        manifest,
+        tokenizer,
+        image_mean=None,
+        image_std=None,
+        image_size: Optional[int] = None,
+        max_text_length: Optional[int] = None,
+    ):
         self.manifest = manifest.reset_index(drop=True)
         self.tokenizer = tokenizer
         self.image_mean = torch.tensor(image_mean or [0.485, 0.456, 0.406]).view(3, 1, 1)
         self.image_std = torch.tensor(image_std or [0.229, 0.224, 0.225]).view(3, 1, 1)
         self.image_size = image_size
+        self.max_text_length = max_text_length
+        self.bos_token_id = getattr(tokenizer, "bos_token_id", None)
+        self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
 
     def __len__(self) -> int:
         return len(self.manifest)
@@ -42,20 +56,67 @@ class ResizeCachedReportDataset(Dataset):
         array = np.asarray(image, dtype=np.float32) / 255.0
         return torch.from_numpy(array).unsqueeze(0)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
-        row = self.manifest.iloc[idx]
-        pixel_values = self._load_png_tensor(row["processed_image_path"])
-        mask = self._load_mask(row.get("processed_mask_path"), pixel_values.shape)
+    def _tokenize_report(self, report_text: str) -> Dict[str, torch.Tensor]:
+        normalized = report_text.rstrip() + "\n"
+        token_limit = self.max_text_length
+        reserve = int(self.bos_token_id is not None) + int(self.eos_token_id is not None)
+        if token_limit is not None:
+            token_limit = max(1, token_limit - reserve)
         tokenized = self.tokenizer(
-            row["report_text"],
-            truncation=True,
+            normalized,
+            truncation=token_limit is not None,
+            max_length=token_limit,
             padding=False,
+            add_special_tokens=False,
             return_tensors="pt",
         )
+        input_ids = tokenized["input_ids"].squeeze(0)
+        attention_mask = tokenized["attention_mask"].squeeze(0)
+
+        prefix = []
+        suffix = []
+        if self.bos_token_id is not None:
+            prefix.append(self.bos_token_id)
+        if self.eos_token_id is not None:
+            suffix.append(self.eos_token_id)
+
+        if prefix:
+            prefix_tensor = torch.tensor(prefix, dtype=input_ids.dtype)
+            input_ids = torch.cat([prefix_tensor, input_ids], dim=0)
+            attention_mask = torch.cat(
+                [torch.ones(len(prefix), dtype=attention_mask.dtype), attention_mask],
+                dim=0,
+            )
+        if suffix:
+            suffix_tensor = torch.tensor(suffix, dtype=input_ids.dtype)
+            input_ids = torch.cat([input_ids, suffix_tensor], dim=0)
+            attention_mask = torch.cat(
+                [attention_mask, torch.ones(len(suffix), dtype=attention_mask.dtype)],
+                dim=0,
+            )
+
         return {
-            "pixel_values": pixel_values,
-            "anatomical_masks": mask,
-            "input_ids": tokenized["input_ids"].squeeze(0),
-            "attention_mask": tokenized["attention_mask"].squeeze(0),
-            "report_id": row.get("report_id", idx),
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
         }
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        dataset_size = len(self.manifest)
+        for offset in range(dataset_size):
+            current_idx = (idx + offset) % dataset_size
+            row = self.manifest.iloc[current_idx]
+            try:
+                pixel_values = self._load_png_tensor(row["processed_image_path"])
+                mask = self._load_mask(row.get("processed_mask_path"), pixel_values.shape)
+            except (FileNotFoundError, OSError, UnidentifiedImageError, ValueError) as exc:
+                LOGGER.warning("Skipping unreadable sample at %s: %s", row.get("processed_image_path", "<unknown>"), exc)
+                continue
+            tokenized = self._tokenize_report(str(row["report_text"]))
+            return {
+                "pixel_values": pixel_values,
+                "anatomical_masks": mask,
+                "input_ids": tokenized["input_ids"],
+                "attention_mask": tokenized["attention_mask"],
+                "report_id": row.get("report_id", current_idx),
+            }
+        raise RuntimeError("No readable image samples remain in the dataset.")
