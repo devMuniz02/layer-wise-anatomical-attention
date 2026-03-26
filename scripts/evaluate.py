@@ -41,6 +41,8 @@ README_EVAL_START = "<!-- EVAL_RESULTS_START -->"
 README_EVAL_END = "<!-- EVAL_RESULTS_END -->"
 MIMIC_RESULTS_START = "<!-- MIMIC_TEST_RESULTS_START -->"
 MIMIC_RESULTS_END = "<!-- MIMIC_TEST_RESULTS_END -->"
+ALL_TEST_KEY = "all_test"
+FINDINGS_ONLY_TEST_KEY = "findings_only_test"
 
 
 def default_device() -> str:
@@ -106,7 +108,7 @@ def _resolve_processed_image_path(subject_id: int, study_id: int, dicom_id: str,
     return image_root / f"p{subject_id}" / f"s{study_id}" / f"{dicom_id}.png"
 
 
-def _build_mimic_test_manifest(mimic_root: Path, limit: int = 0) -> pd.DataFrame:
+def _build_mimic_test_manifest(mimic_root: Path, limit: int = 0, findings_only: bool = False) -> pd.DataFrame:
     split_df = pd.read_csv(mimic_root / "mimic-cxr-2.0.0-split.csv.gz", compression="gzip")
     records_df = pd.read_csv(mimic_root / "cxr-record-list.csv.gz", compression="gzip")
     metadata_df = pd.read_csv(mimic_root / "mimic-cxr-2.0.0-metadata.csv")
@@ -114,6 +116,9 @@ def _build_mimic_test_manifest(mimic_root: Path, limit: int = 0) -> pd.DataFrame
     reports = _load_report_texts(mimic_root / "mimic-cxr-reports.zip")
 
     df = split_df[split_df["split"] == "test"].copy()
+    if findings_only:
+        findings_df = pd.read_csv(mimic_root / "mimic-cxr-2.0.0-metadata-findings-only.csv")
+        df = df.merge(findings_df[["subject_id", "study_id", "dicom_id"]], on=["subject_id", "study_id", "dicom_id"], how="inner")
     df = df.merge(records_df, on=["subject_id", "study_id", "dicom_id"], how="left")
     df = df.merge(metadata_df[["subject_id", "study_id", "dicom_id", "ViewPosition"]], on=["subject_id", "study_id", "dicom_id"], how="left")
     df = df.merge(chexpert_df[["subject_id", "study_id"] + CHEXPERT_LABEL_COLUMNS], on=["subject_id", "study_id"], how="left")
@@ -138,6 +143,14 @@ def _build_mimic_test_manifest(mimic_root: Path, limit: int = 0) -> pd.DataFrame
     if df.empty:
         raise RuntimeError("No usable MIMIC test examples were found after joins and file checks.")
     return df.reset_index(drop=True)
+
+
+def _build_findings_only_lookup(mimic_root: Path) -> set[tuple[int, int]]:
+    manifest = _build_mimic_test_manifest(mimic_root=mimic_root, findings_only=True)
+    return {
+        (int(row.subject_id), int(row.study_id))
+        for row in manifest[["subject_id", "study_id"]].drop_duplicates().itertuples(index=False)
+    }
 
 
 def _load_chexpert_reference_labels(mimic_root: Path) -> pd.DataFrame:
@@ -211,6 +224,36 @@ def _decode_prediction(model: LanaForConditionalGeneration, token_ids: torch.Ten
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _compute_metrics(records_df: pd.DataFrame, split_name: str, subset_name: str, view_filter: str) -> dict:
+    predictions = records_df["prediction"].fillna("").astype(str).tolist()
+    references = records_df["reference"].fillna("").astype(str).tolist()
+    reference_labels = []
+    for _, row in records_df.iterrows():
+        reference_labels.append({label: int(row[label]) for label in CHEXPERT_LABEL_COLUMNS})
+
+    chexpert_metrics = chexpert_label_f1_from_reference_labels(predictions, reference_labels)
+    radgraph_metrics = radgraph_f1(predictions, references)
+    return {
+        "split": split_name,
+        "subset": subset_name,
+        "dataset": "mimic-cxr",
+        "view_filter": view_filter,
+        "num_examples": len(records_df),
+        "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
+        "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
+        "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
+        "chexpert_f1_5_macro": chexpert_metrics["chexpert_f1_5_macro"],
+        "chexpert_f1_micro": chexpert_metrics["chexpert_f1_micro"],
+        "chexpert_f1_macro": chexpert_metrics["chexpert_f1_macro"],
+        "chexpert_per_label_f1": chexpert_metrics["chexpert_per_label_f1"],
+        "radgraph_f1": radgraph_metrics["radgraph_f1"],
+        "radgraph_f1_entity": radgraph_metrics["radgraph_f1_entity"],
+        "radgraph_f1_relation": radgraph_metrics["radgraph_f1_relation"],
+        "radgraph_available": radgraph_metrics["radgraph_available"],
+        "radgraph_error": radgraph_metrics["radgraph_error"],
+    }
+
+
 def _evaluate_model(
     model: LanaForConditionalGeneration,
     manifest: pd.DataFrame,
@@ -219,9 +262,6 @@ def _evaluate_model(
     max_new_tokens: int,
     batch_size: int,
 ) -> tuple[list[dict], dict]:
-    predictions = []
-    references = []
-    reference_labels = []
     records = []
 
     with torch.inference_mode():
@@ -238,17 +278,16 @@ def _evaluate_model(
                 reference_text = str(row["report_text"]).strip()
                 label_map = {label: int(row[label]) for label in CHEXPERT_LABEL_COLUMNS}
 
-                predictions.append(prediction_text)
-                references.append(reference_text)
-                reference_labels.append(label_map)
                 records.append(
                     {
                         "subject_id": int(row["subject_id"]),
                         "study_id": int(row["study_id"]),
                         "dicom_id": str(row["dicom_id"]),
                         "image_path": row["processed_image_path"],
+                        "processed_image_path": row["processed_image_path"],
                         "prediction": prediction_text,
                         "reference": reference_text,
+                        **label_map,
                     }
                 )
 
@@ -256,26 +295,12 @@ def _evaluate_model(
             if completed % 100 == 0 or completed == len(manifest):
                 LOGGER.info("Generated %s / %s test reports", completed, len(manifest))
 
-    chexpert_metrics = chexpert_label_f1_from_reference_labels(predictions, reference_labels)
-    radgraph_metrics = radgraph_f1(predictions, references)
-    metrics = {
-        "split": "test",
-        "dataset": "mimic-cxr",
-        "view_filter": "frontal-only (PA/AP)",
-        "num_examples": len(records),
-        "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
-        "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
-        "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
-        "chexpert_f1_5_macro": chexpert_metrics["chexpert_f1_5_macro"],
-        "chexpert_f1_micro": chexpert_metrics["chexpert_f1_micro"],
-        "chexpert_f1_macro": chexpert_metrics["chexpert_f1_macro"],
-        "chexpert_per_label_f1": chexpert_metrics["chexpert_per_label_f1"],
-        "radgraph_f1": radgraph_metrics["radgraph_f1"],
-        "radgraph_f1_entity": radgraph_metrics["radgraph_f1_entity"],
-        "radgraph_f1_relation": radgraph_metrics["radgraph_f1_relation"],
-        "radgraph_available": radgraph_metrics["radgraph_available"],
-        "radgraph_error": radgraph_metrics["radgraph_error"],
-    }
+    metrics = _compute_metrics(
+        pd.DataFrame(records),
+        split_name="test",
+        subset_name="all frontal studies",
+        view_filter="frontal-only (PA/AP)",
+    )
     return records, metrics
 
 
@@ -289,34 +314,24 @@ def _evaluate_saved_predictions(predictions_path: Path, mimic_root: Path) -> tup
         missing = records_df[records_df[CHEXPERT_LABEL_COLUMNS].isnull().any(axis=1)][["subject_id", "study_id"]].drop_duplicates()
         raise RuntimeError(f"Missing CheXpert labels for {len(missing)} prediction rows.")
 
-    predictions = records_df["prediction"].fillna("").astype(str).tolist()
-    references = records_df["reference"].fillna("").astype(str).tolist()
-    reference_labels = []
-    for _, row in records_df.iterrows():
-        reference_labels.append({label: int(row[label]) for label in CHEXPERT_LABEL_COLUMNS})
-
-    chexpert_metrics = chexpert_label_f1_from_reference_labels(predictions, reference_labels)
-    radgraph_metrics = radgraph_f1(predictions, references)
-    metrics = {
-        "split": "test",
-        "dataset": "mimic-cxr",
-        "view_filter": "frontal-only (PA/AP)",
-        "num_examples": len(records_df),
-        "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
-        "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
-        "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
-        "chexpert_f1_5_macro": chexpert_metrics["chexpert_f1_5_macro"],
-        "chexpert_f1_micro": chexpert_metrics["chexpert_f1_micro"],
-        "chexpert_f1_macro": chexpert_metrics["chexpert_f1_macro"],
-        "chexpert_per_label_f1": chexpert_metrics["chexpert_per_label_f1"],
-        "radgraph_f1": radgraph_metrics["radgraph_f1"],
-        "radgraph_f1_entity": radgraph_metrics["radgraph_f1_entity"],
-        "radgraph_f1_relation": radgraph_metrics["radgraph_f1_relation"],
-        "radgraph_available": radgraph_metrics["radgraph_available"],
-        "radgraph_error": radgraph_metrics["radgraph_error"],
-    }
+    metrics = _compute_metrics(
+        records_df,
+        split_name="test",
+        subset_name="all frontal studies",
+        view_filter="frontal-only (PA/AP)",
+    )
     records = records_df.to_dict(orient="records")
     return records, metrics
+
+
+def _filter_findings_only_records(records_df: pd.DataFrame, mimic_root: Path) -> pd.DataFrame:
+    findings_lookup = _build_findings_only_lookup(mimic_root)
+    filtered = records_df[
+        records_df.apply(lambda row: (int(row["subject_id"]), int(row["study_id"])) in findings_lookup, axis=1)
+    ].copy()
+    if filtered.empty:
+        raise RuntimeError("No findings-only rows matched the saved MIMIC test predictions.")
+    return filtered
 
 
 def _format_metric(value) -> str:
@@ -326,12 +341,52 @@ def _format_metric(value) -> str:
         return f"{value:.4f}"
     return str(value)
 
-def _update_model_card(run_dir: Path, metrics: dict) -> None:
+def _metrics_block_lines(title: str, metrics: dict) -> list[str]:
+    return [
+        f"### {title}",
+        "",
+        f"- View filter: `{metrics['view_filter']}`",
+        f"- Number of examples: `{metrics['num_examples']}`",
+        f"- CheXpert F1 14-micro: `{_format_metric(metrics['chexpert_f1_14_micro'])}`",
+        f"- CheXpert F1 5-micro: `{_format_metric(metrics['chexpert_f1_5_micro'])}`",
+        f"- CheXpert F1 14-macro: `{_format_metric(metrics['chexpert_f1_14_macro'])}`",
+        f"- CheXpert F1 5-macro: `{_format_metric(metrics['chexpert_f1_5_macro'])}`",
+        f"- RadGraph F1: `{_format_metric(metrics['radgraph_f1'])}`",
+        f"- RadGraph entity F1: `{_format_metric(metrics['radgraph_f1_entity'])}`",
+        f"- RadGraph relation F1: `{_format_metric(metrics['radgraph_f1_relation'])}`",
+        f"- RadGraph available: `{metrics['radgraph_available']}`",
+        f"- RadGraph error: `{metrics['radgraph_error']}`",
+        "",
+    ]
+
+
+def _results_table_lines(title: str, metrics: dict) -> list[str]:
+    return [
+        f"### {title}",
+        "",
+        "| Metric | Value |",
+        "| --- | --- |",
+        f"| Number of studies | `{metrics['num_examples']}` |",
+        f"| RadGraph F1 | `{_format_metric(metrics['radgraph_f1'])}` |",
+        f"| RadGraph entity F1 | `{_format_metric(metrics['radgraph_f1_entity'])}` |",
+        f"| RadGraph relation F1 | `{_format_metric(metrics['radgraph_f1_relation'])}` |",
+        f"| CheXpert F1 14-micro | `{_format_metric(metrics['chexpert_f1_14_micro'])}` |",
+        f"| CheXpert F1 5-micro | `{_format_metric(metrics['chexpert_f1_5_micro'])}` |",
+        f"| CheXpert F1 14-macro | `{_format_metric(metrics['chexpert_f1_14_macro'])}` |",
+        f"| CheXpert F1 5-macro | `{_format_metric(metrics['chexpert_f1_5_macro'])}` |",
+        "",
+    ]
+
+
+def _update_model_card(run_dir: Path, metrics_bundle: dict) -> None:
     readme_path = run_dir / "README.md"
     if readme_path.exists():
         current = readme_path.read_text(encoding="utf-8")
     else:
         current = f"# {run_dir.name}\n"
+
+    all_test_metrics = metrics_bundle[ALL_TEST_KEY]
+    findings_metrics = metrics_bundle[FINDINGS_ONLY_TEST_KEY]
 
     evaluation_section = "\n".join(
         [
@@ -339,20 +394,11 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
             "## Latest Evaluation",
             "",
             "- Dataset: `MIMIC-CXR test`",
-            f"- View filter: `{metrics['view_filter']}`",
-            f"- Number of examples: `{metrics['num_examples']}`",
-            f"- CheXpert F1 14-micro: `{_format_metric(metrics['chexpert_f1_14_micro'])}`",
-            f"- CheXpert F1 5-micro: `{_format_metric(metrics['chexpert_f1_5_micro'])}`",
-            f"- CheXpert F1 14-macro: `{_format_metric(metrics['chexpert_f1_14_macro'])}`",
-            f"- CheXpert F1 5-macro: `{_format_metric(metrics['chexpert_f1_5_macro'])}`",
-            f"- RadGraph F1: `{_format_metric(metrics['radgraph_f1'])}`",
-            f"- RadGraph entity F1: `{_format_metric(metrics['radgraph_f1_entity'])}`",
-            f"- RadGraph relation F1: `{_format_metric(metrics['radgraph_f1_relation'])}`",
-            f"- RadGraph available: `{metrics['radgraph_available']}`",
-            f"- RadGraph error: `{metrics['radgraph_error']}`",
-            "",
+            *_metrics_block_lines("All Frontal Test Studies", all_test_metrics),
+            *_metrics_block_lines("Findings-Only Frontal Test Studies", findings_metrics),
             "- Evaluation file: `evaluations/mimic_test_metrics.json`",
             "- Predictions file: `evaluations/mimic_test_predictions.csv`",
+            "- Findings-only predictions file: `evaluations/mimic_test_findings_only_predictions.csv`",
             README_EVAL_END,
         ]
     )
@@ -365,17 +411,8 @@ def _update_model_card(run_dir: Path, metrics: dict) -> None:
             "",
             "### Current Checkpoint Results",
             "",
-            "| Metric | Value |",
-            "| --- | --- |",
-            f"| Number of studies | `{metrics['num_examples']}` |",
-            f"| RadGraph F1 | `{_format_metric(metrics['radgraph_f1'])}` |",
-            f"| RadGraph entity F1 | `{_format_metric(metrics['radgraph_f1_entity'])}` |",
-            f"| RadGraph relation F1 | `{_format_metric(metrics['radgraph_f1_relation'])}` |",
-            f"| CheXpert F1 14-micro | `{_format_metric(metrics['chexpert_f1_14_micro'])}` |",
-            f"| CheXpert F1 5-micro | `{_format_metric(metrics['chexpert_f1_5_micro'])}` |",
-            f"| CheXpert F1 14-macro | `{_format_metric(metrics['chexpert_f1_14_macro'])}` |",
-            f"| CheXpert F1 5-macro | `{_format_metric(metrics['chexpert_f1_5_macro'])}` |",
-            "",
+            *_results_table_lines("All Frontal Test Studies", all_test_metrics),
+            *_results_table_lines("Findings-Only Frontal Test Studies", findings_metrics),
             "### Final Completed Training Results",
             "",
             "The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.",
@@ -430,6 +467,15 @@ def _merge_existing_metrics(metrics_path: Path, metrics: dict) -> dict:
     return metrics
 
 
+def _build_metrics_bundle(all_test_metrics: dict, findings_metrics: dict) -> dict:
+    return {
+        **all_test_metrics,
+        "evaluation_suite": "mimic_test_dual",
+        ALL_TEST_KEY: all_test_metrics,
+        FINDINGS_ONLY_TEST_KEY: findings_metrics,
+    }
+
+
 def main() -> None:
     args = build_parser().parse_args()
     configure_logging(args.log_level)
@@ -440,13 +486,13 @@ def main() -> None:
     if args.predictions_csv:
         predictions_path = Path(args.predictions_csv)
         LOGGER.info("Recomputing evaluation metrics from saved predictions at %s", predictions_path)
-        records, metrics = _evaluate_saved_predictions(predictions_path=predictions_path, mimic_root=mimic_root)
+        records, all_test_metrics = _evaluate_saved_predictions(predictions_path=predictions_path, mimic_root=mimic_root)
     else:
         manifest = _build_mimic_test_manifest(mimic_root=mimic_root, limit=args.limit)
         LOGGER.info("Evaluating run_dir=%s on %s MIMIC test studies", run_dir, len(manifest))
 
         model = _load_model(run_dir=run_dir, device=device)
-        records, metrics = _evaluate_model(
+        records, all_test_metrics = _evaluate_model(
             model,
             manifest,
             device=device,
@@ -455,25 +501,47 @@ def main() -> None:
             batch_size=args.batch_size,
         )
 
+    records_df = pd.DataFrame(records)
+    findings_records_df = _filter_findings_only_records(records_df, mimic_root)
+    findings_metrics = _compute_metrics(
+        findings_records_df,
+        split_name="test",
+        subset_name="findings-only frontal studies",
+        view_filter="frontal-only (PA/AP), structured Findings section only",
+    )
+
     evaluations_dir = run_dir / "evaluations"
     evaluations_dir.mkdir(parents=True, exist_ok=True)
     predictions_path = evaluations_dir / "mimic_test_predictions.csv"
+    findings_predictions_path = evaluations_dir / "mimic_test_findings_only_predictions.csv"
     metrics_path = evaluations_dir / "mimic_test_metrics.json"
-    metrics = _merge_existing_metrics(metrics_path, metrics)
-    pd.DataFrame(records).to_csv(predictions_path, index=False)
-    metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    all_test_metrics = _merge_existing_metrics(metrics_path, all_test_metrics)
+    findings_metrics = _merge_existing_metrics(
+        evaluations_dir / "mimic_test_findings_only_metrics.json",
+        findings_metrics,
+    )
+    metrics_bundle = _build_metrics_bundle(all_test_metrics, findings_metrics)
+    records_df.to_csv(predictions_path, index=False)
+    findings_records_df.to_csv(findings_predictions_path, index=False)
+    metrics_path.write_text(json.dumps(metrics_bundle, indent=2), encoding="utf-8")
+    (evaluations_dir / "mimic_test_findings_only_metrics.json").write_text(json.dumps(findings_metrics, indent=2), encoding="utf-8")
 
     summary_path = run_dir / "run_summary.json"
     if summary_path.exists():
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
     else:
         summary = {}
-    summary["latest_evaluation"] = metrics
+    summary["latest_evaluation"] = all_test_metrics
+    summary["latest_evaluations"] = {
+        ALL_TEST_KEY: all_test_metrics,
+        FINDINGS_ONLY_TEST_KEY: findings_metrics,
+    }
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    _update_model_card(run_dir, metrics)
+    _update_model_card(run_dir, metrics_bundle)
     LOGGER.info("Saved evaluation metrics to %s", metrics_path)
     LOGGER.info("Saved predictions to %s", predictions_path)
+    LOGGER.info("Saved findings-only predictions to %s", findings_predictions_path)
 
     if args.push_to_hub:
         repo_url = push_directory_to_hub(str(run_dir), args.repo_id, commit_message="Upload MIMIC test evaluation results")

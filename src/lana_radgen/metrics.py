@@ -301,9 +301,17 @@ def radgraph_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[s
     os.makedirs = safe_makedirs
     try:
         scorer = F1RadGraph(reward_level="all", model_type="radgraph-xl")
+        mean_reward, *_ = scorer(hyps=list(predictions), refs=list(references))
+    except Exception as exc:  # pragma: no cover - optional dependency/runtime path
+        return {
+            "radgraph_f1": None,
+            "radgraph_f1_entity": None,
+            "radgraph_f1_relation": None,
+            "radgraph_available": False,
+            "radgraph_error": repr(exc),
+        }
     finally:
         os.makedirs = real_makedirs
-    mean_reward, *_ = scorer(hyps=list(predictions), refs=list(references))
     entity_f1, relation_f1, combined_f1 = mean_reward
     return {
         "radgraph_f1": float(combined_f1),

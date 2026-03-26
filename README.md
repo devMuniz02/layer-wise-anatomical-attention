@@ -93,6 +93,8 @@ Frontal-only evaluation using `PA/AP` studies only.
 
 ### Current Checkpoint Results
 
+### All Frontal Test Studies
+
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
@@ -103,6 +105,19 @@ Frontal-only evaluation using `PA/AP` studies only.
 | CheXpert F1 5-micro | `0.2183` |
 | CheXpert F1 14-macro | `0.1095` |
 | CheXpert F1 5-macro | `0.1634` |
+
+### Findings-Only Frontal Test Studies
+
+| Metric | Value |
+| --- | --- |
+| Number of studies | `2210` |
+| RadGraph F1 | `0.1010` |
+| RadGraph entity F1 | `0.1517` |
+| RadGraph relation F1 | `0.1347` |
+| CheXpert F1 14-micro | `0.1651` |
+| CheXpert F1 5-micro | `0.2152` |
+| CheXpert F1 14-macro | `0.1047` |
+| CheXpert F1 5-macro | `0.1611` |
 
 ### Final Completed Training Results
 
@@ -180,6 +195,8 @@ print(report)
 ## Latest Evaluation
 
 - Dataset: `MIMIC-CXR test`
+### All Frontal Test Studies
+
 - View filter: `frontal-only (PA/AP)`
 - Number of examples: `3041`
 - CheXpert F1 14-micro: `0.1829`
@@ -192,6 +209,21 @@ print(report)
 - RadGraph available: `True`
 - RadGraph error: `None`
 
+### Findings-Only Frontal Test Studies
+
+- View filter: `frontal-only (PA/AP), structured Findings section only`
+- Number of examples: `2210`
+- CheXpert F1 14-micro: `0.1651`
+- CheXpert F1 5-micro: `0.2152`
+- CheXpert F1 14-macro: `0.1047`
+- CheXpert F1 5-macro: `0.1611`
+- RadGraph F1: `0.1010`
+- RadGraph entity F1: `0.1517`
+- RadGraph relation F1: `0.1347`
+- RadGraph available: `True`
+- RadGraph error: `None`
+
 - Evaluation file: `evaluations/mimic_test_metrics.json`
 - Predictions file: `evaluations/mimic_test_predictions.csv`
+- Findings-only predictions file: `evaluations/mimic_test_findings_only_predictions.csv`
 <!-- EVAL_RESULTS_END -->
