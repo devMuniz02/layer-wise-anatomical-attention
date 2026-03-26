@@ -952,6 +952,10 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
     target_epochs = max(int(summary.get("target_epochs", 0) or 0), 1)
     progress_epochs = float(summary.get("progress_epochs", summary.get("epoch_index", 0)))
     completion_percent = float(summary.get("training_completion_percent", (progress_epochs / target_epochs) * 100.0))
+    display_epochs = progress_epochs
+    if bool(summary.get("completed")):
+        epochs_completed = int(summary.get("epochs_completed", target_epochs) or target_epochs)
+        display_epochs = float(min(max(epochs_completed, 0), target_epochs))
     benchmark_lines = []
     for item in benchmark_results:
         if item["status"] == "ok":
@@ -1002,7 +1006,7 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
         "- Project status: `Training in progress`",
         "- Release status: `Research preview checkpoint`",
         "- Current checkpoint status: `Not final`",
-        f"- Training completion toward planned run: `{completion_percent:.2f}%` (`{progress_epochs:.3f}` / `{target_epochs}` epochs)",
+        f"- Training completion toward planned run: `{completion_percent:.2f}%` (`{display_epochs:.0f}` / `{target_epochs}` epochs)",
         "- Current published metrics are intermediate and will change as training continues.",
         "",
         "## Overview",

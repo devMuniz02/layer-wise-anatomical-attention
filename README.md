@@ -34,7 +34,7 @@ metrics:
 - Project status: `Training completed`
 - Release status: `Completed training run`
 - Current checkpoint status: `Final completed run`
-- Training completion toward planned run: `100.00%` (`4.000` / `3` epochs)
+- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
 - Current published metrics correspond to the completed training run.
 
 ## Overview
