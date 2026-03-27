@@ -39,6 +39,7 @@ The architecture combines a DINOv3 vision encoder, lung and heart segmentation h
 
 Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
 Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
+You must set an `HF_TOKEN` environment variable with permission to access the DINOv3 model repositories used by this project, otherwise the required vision backbones cannot be downloaded.
 
 ```python
 from pathlib import Path
@@ -170,5 +171,6 @@ These final-report metrics correspond to the completed training run.
 
 ## Notes
 
+- Set `HF_TOKEN` with permission to access the DINOv3 repositories required by this model before downloading or running inference.
 - `segmenters/` contains the lung and heart segmentation checkpoints used to build anatomical attention masks.
 - `evaluations/mimic_test_metrics.json` contains the latest saved MIMIC test metrics.

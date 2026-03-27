@@ -91,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--metadata-path", default="Datasets/CheXpert/df_chexpert_plus_240401_findings.csv")
     parser.add_argument("--image-root", default="Datasets/CheXpert/images")
     parser.add_argument("--mimic-root", default="Datasets/MIMIC")
+    parser.add_argument("--mimic-findings-only", action="store_true", help="Restrict MIMIC rows to studies with a structured FINDINGS section only.")
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--global-batch-size", type=int, default=0, help="Effective batch size via gradient accumulation. 0 uses local batch size.")
     parser.add_argument("--eval-batch-size", type=int, default=2)
@@ -193,18 +194,20 @@ def build_chexpert_manifest(metadata_path: str, image_root: str, split: str) -> 
     return manifest
 
 
-def _parse_findings_section(report_text: str) -> str:
+def _extract_report_section(report_text: str, allow_impression_fallback: bool = True) -> str:
     normalized = report_text.replace("\r\n", "\n")
     match = re.search(r"FINDINGS:\s*(.*?)(?:\n\s*[A-Z ]+:\s|$)", normalized, flags=re.IGNORECASE | re.DOTALL)
     if match:
         return re.sub(r"\s+", " ", match.group(1)).strip()
-    impression_match = re.search(r"IMPRESSION:\s*(.*?)(?:\n\s*[A-Z ]+:\s|$)", normalized, flags=re.IGNORECASE | re.DOTALL)
-    if impression_match:
-        return re.sub(r"\s+", " ", impression_match.group(1)).strip()
-    return re.sub(r"\s+", " ", normalized).strip()
+    if allow_impression_fallback:
+        impression_match = re.search(r"IMPRESSION:\s*(.*?)(?:\n\s*[A-Z ]+:\s|$)", normalized, flags=re.IGNORECASE | re.DOTALL)
+        if impression_match:
+            return re.sub(r"\s+", " ", impression_match.group(1)).strip()
+        return re.sub(r"\s+", " ", normalized).strip()
+    return ""
 
 
-def _load_report_texts(report_zip_path: Path) -> dict[tuple[int, int], str]:
+def _load_report_texts(report_zip_path: Path, allow_impression_fallback: bool = True) -> dict[tuple[int, int], str]:
     reports = {}
     with zipfile.ZipFile(report_zip_path) as archive:
         for name in archive.namelist():
@@ -216,7 +219,7 @@ def _load_report_texts(report_zip_path: Path) -> dict[tuple[int, int], str]:
             subject_id = int(match.group(1))
             study_id = int(match.group(2))
             text = archive.read(name).decode("utf-8", errors="ignore")
-            reports[(subject_id, study_id)] = _parse_findings_section(text)
+            reports[(subject_id, study_id)] = _extract_report_section(text, allow_impression_fallback=allow_impression_fallback)
     return reports
 
 
@@ -224,15 +227,18 @@ def _resolve_mimic_processed_image_path(subject_id: int, study_id: int, dicom_id
     return image_root / f"p{subject_id}" / f"s{study_id}" / f"{dicom_id}.png"
 
 
-def build_mimic_manifest(mimic_root: str, split: str) -> pd.DataFrame:
+def build_mimic_manifest(mimic_root: str, split: str, findings_only: bool = False) -> pd.DataFrame:
     root = Path(mimic_root)
     split_df = pd.read_csv(root / "mimic-cxr-2.0.0-split.csv.gz", compression="gzip")
     records_df = pd.read_csv(root / "cxr-record-list.csv.gz", compression="gzip")
     metadata_df = pd.read_csv(root / "mimic-cxr-2.0.0-metadata.csv")
-    reports = _load_report_texts(root / "mimic-cxr-reports.zip")
+    reports = _load_report_texts(root / "mimic-cxr-reports.zip", allow_impression_fallback=not findings_only)
 
     split_name = "validate" if split == "valid" else split
     df = split_df[split_df["split"] == split_name].copy()
+    if findings_only:
+        findings_df = pd.read_csv(root / "mimic-cxr-2.0.0-metadata-findings-only.csv")
+        df = df.merge(findings_df[["subject_id", "study_id", "dicom_id"]], on=["subject_id", "study_id", "dicom_id"], how="inner")
     df = df.merge(records_df, on=["subject_id", "study_id", "dicom_id"], how="left")
     df = df.merge(metadata_df[["subject_id", "study_id", "dicom_id", "ViewPosition"]], on=["subject_id", "study_id", "dicom_id"], how="left")
 
@@ -1011,6 +1017,7 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
         "",
         "Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.",
         "Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.",
+        "You must set an `HF_TOKEN` environment variable with permission to access the DINOv3 model repositories used by this project, otherwise the required vision backbones cannot be downloaded.",
         "",
         "```python",
         "from pathlib import Path",
@@ -1141,6 +1148,7 @@ def write_model_card(output_dir: Path, summary: dict, benchmark_results: list[di
         "",
         "## Notes",
         "",
+        "- Set `HF_TOKEN` with permission to access the DINOv3 repositories required by this model before downloading or running inference.",
         "- `segmenters/` contains the lung and heart segmentation checkpoints used to build anatomical attention masks.",
         "- `evaluations/mimic_test_metrics.json` contains the latest saved MIMIC test metrics.",
     ]
@@ -1178,10 +1186,11 @@ def main() -> None:
         train_dataset_names.append("CheXpert")
         valid_dataset_names.append("CheXpert")
     if args.dataset in {"mimic", "combined"}:
-        train_parts.append(build_mimic_manifest(args.mimic_root, split="train"))
-        valid_parts.append(build_mimic_manifest(args.mimic_root, split="valid"))
-        train_dataset_names.append("MIMIC-CXR")
-        valid_dataset_names.append("MIMIC-CXR")
+        train_parts.append(build_mimic_manifest(args.mimic_root, split="train", findings_only=args.mimic_findings_only))
+        valid_parts.append(build_mimic_manifest(args.mimic_root, split="valid", findings_only=args.mimic_findings_only))
+        mimic_label = "MIMIC-CXR (findings-only)" if args.mimic_findings_only else "MIMIC-CXR"
+        train_dataset_names.append(mimic_label)
+        valid_dataset_names.append(mimic_label)
 
     train_manifest = combine_manifests(train_parts)
     valid_manifest = combine_manifests(valid_parts)
