@@ -145,6 +145,92 @@ def corpus_bleu_4(predictions: Sequence[str], references: Sequence[str], max_n: 
     return float(brevity_penalty * math.exp(sum(math.log(p) for p in precisions) / max_n))
 
 
+def corpus_bleu_1(predictions: Sequence[str], references: Sequence[str]) -> float:
+    return corpus_bleu_4(predictions, references, max_n=1)
+
+
+def _lcs_length(tokens_a: Sequence[str], tokens_b: Sequence[str]) -> int:
+    if not tokens_a or not tokens_b:
+        return 0
+    dp = [[0] * (len(tokens_b) + 1) for _ in range(len(tokens_a) + 1)]
+    for idx_a, token_a in enumerate(tokens_a, start=1):
+        for idx_b, token_b in enumerate(tokens_b, start=1):
+            if token_a == token_b:
+                dp[idx_a][idx_b] = dp[idx_a - 1][idx_b - 1] + 1
+            else:
+                dp[idx_a][idx_b] = max(dp[idx_a - 1][idx_b], dp[idx_a][idx_b - 1])
+    return dp[-1][-1]
+
+
+def rouge_l(predictions: Sequence[str], references: Sequence[str], beta: float = 1.2) -> float:
+    scores = []
+    beta_sq = beta * beta
+    for prediction, reference in zip(predictions, references):
+        pred_tokens = _tokenize(prediction)
+        ref_tokens = _tokenize(reference)
+        lcs = _lcs_length(pred_tokens, ref_tokens)
+        if lcs == 0:
+            scores.append(0.0)
+            continue
+        precision = lcs / max(len(pred_tokens), 1)
+        recall = lcs / max(len(ref_tokens), 1)
+        denom = recall + beta_sq * precision
+        if denom == 0:
+            scores.append(0.0)
+        else:
+            scores.append(((1 + beta_sq) * precision * recall) / denom)
+    return float(sum(scores) / max(len(scores), 1))
+
+
+def meteor_score(predictions: Sequence[str], references: Sequence[str], alpha: float = 0.9, gamma: float = 0.5, beta: float = 3.0) -> float:
+    scores = []
+    for prediction, reference in zip(predictions, references):
+        pred_tokens = _tokenize(prediction)
+        ref_tokens = _tokenize(reference)
+        if not pred_tokens and not ref_tokens:
+            scores.append(1.0)
+            continue
+        if not pred_tokens or not ref_tokens:
+            scores.append(0.0)
+            continue
+
+        ref_counter = Counter(ref_tokens)
+        matched_flags = []
+        matched_positions = []
+        matches = 0
+        for idx, token in enumerate(pred_tokens):
+            if ref_counter[token] > 0:
+                ref_counter[token] -= 1
+                matches += 1
+                matched_flags.append(True)
+                try:
+                    matched_positions.append(ref_tokens.index(token, matched_positions[-1] + 1 if matched_positions else 0))
+                except ValueError:
+                    matched_positions.append(ref_tokens.index(token))
+            else:
+                matched_flags.append(False)
+
+        if matches == 0:
+            scores.append(0.0)
+            continue
+
+        precision = matches / len(pred_tokens)
+        recall = matches / len(ref_tokens)
+        denom = alpha * precision + (1 - alpha) * recall
+        f_mean = 0.0 if denom == 0 else (precision * recall) / denom
+
+        chunks = 0
+        previous_matched = False
+        for matched in matched_flags:
+            if matched and not previous_matched:
+                chunks += 1
+            previous_matched = matched
+        penalty = gamma * ((chunks / matches) ** beta)
+        scores.append((1 - penalty) * f_mean)
+
+    return float(sum(scores) / max(len(scores), 1))
+
+
 def cider_d(predictions: Sequence[str], references: Sequence[str], max_n: int = 4) -> float:
     refs_by_n = [Counter() for _ in range(max_n)]
     document_count = max(len(references), 1)
@@ -327,13 +413,26 @@ def summarize_text_metrics(metric_values: Dict[str, float]) -> Dict[str, float]:
 
 
 def default_metric_names() -> List[str]:
-    return ["bleu_4", "cider_d", "chexpert_f1_14_micro", "chexpert_f1_5_micro", "chexpert_f1_14_macro", "chexpert_f1_5_macro"]
+    return [
+        "bleu_1",
+        "bleu_4",
+        "meteor",
+        "rouge_l",
+        "cider_d",
+        "chexpert_f1_14_micro",
+        "chexpert_f1_5_micro",
+        "chexpert_f1_14_macro",
+        "chexpert_f1_5_macro",
+    ]
 
 
 def evaluate_report_generation(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
     chexpert = chexpert_label_f1(predictions, references)
     metrics = {
+        "bleu_1": corpus_bleu_1(predictions, references),
         "bleu_4": corpus_bleu_4(predictions, references),
+        "meteor": meteor_score(predictions, references),
+        "rouge_l": rouge_l(predictions, references),
         "cider_d": cider_d(predictions, references),
         "chexpert_f1_14_micro": chexpert["chexpert_f1_14_micro"],
         "chexpert_f1_5_micro": chexpert["chexpert_f1_5_micro"],

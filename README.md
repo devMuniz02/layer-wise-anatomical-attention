@@ -107,6 +107,9 @@ These final-report metrics correspond to the completed training run.
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
+| ROUGE-L | `0.1513` |
+| BLEU-1 | `0.1707` |
+| METEOR | `0.2079` |
 | RadGraph F1 | `0.0918` |
 | RadGraph entity F1 | `0.1399` |
 | RadGraph relation F1 | `0.1246` |
@@ -120,6 +123,9 @@ These final-report metrics correspond to the completed training run.
 | Metric | Value |
 | --- | --- |
 | Number of studies | `2210` |
+| ROUGE-L | `0.1576` |
+| BLEU-1 | `0.1754` |
+| METEOR | `0.2207` |
 | RadGraph F1 | `0.1010` |
 | RadGraph entity F1 | `0.1517` |
 | RadGraph relation F1 | `0.1347` |

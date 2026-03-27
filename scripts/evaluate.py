@@ -16,7 +16,7 @@ from safetensors.torch import load_file
 from lana_radgen import LanaConfig, LanaForConditionalGeneration
 from lana_radgen.hub import push_directory_to_hub
 from lana_radgen.logging_utils import configure_logging
-from lana_radgen.metrics import chexpert_label_f1_from_reference_labels, radgraph_f1
+from lana_radgen.metrics import chexpert_label_f1_from_reference_labels, corpus_bleu_1, meteor_score, radgraph_f1, rouge_l
 
 LOGGER = logging.getLogger("evaluate")
 
@@ -239,6 +239,9 @@ def _compute_metrics(records_df: pd.DataFrame, split_name: str, subset_name: str
         "dataset": "mimic-cxr",
         "view_filter": view_filter,
         "num_examples": len(records_df),
+        "bleu_1": corpus_bleu_1(predictions, references),
+        "meteor": meteor_score(predictions, references),
+        "rouge_l": rouge_l(predictions, references),
         "chexpert_f1_14_micro": chexpert_metrics["chexpert_f1_14_micro"],
         "chexpert_f1_5_micro": chexpert_metrics["chexpert_f1_5_micro"],
         "chexpert_f1_14_macro": chexpert_metrics["chexpert_f1_14_macro"],
@@ -348,6 +351,9 @@ def _results_table_lines(title: str, metrics: dict) -> list[str]:
         "| Metric | Value |",
         "| --- | --- |",
         f"| Number of studies | `{metrics['num_examples']}` |",
+        f"| ROUGE-L | `{_format_metric(metrics['rouge_l'])}` |",
+        f"| BLEU-1 | `{_format_metric(metrics['bleu_1'])}` |",
+        f"| METEOR | `{_format_metric(metrics['meteor'])}` |",
         f"| RadGraph F1 | `{_format_metric(metrics['radgraph_f1'])}` |",
         f"| RadGraph entity F1 | `{_format_metric(metrics['radgraph_f1_entity'])}` |",
         f"| RadGraph relation F1 | `{_format_metric(metrics['radgraph_f1_relation'])}` |",
