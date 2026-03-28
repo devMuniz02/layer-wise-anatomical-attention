@@ -105,34 +105,34 @@ Frontal-only evaluation using `PA/AP` studies only.
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
-| ROUGE-L | `0.1641` |
-| BLEU-1 | `0.2243` |
-| BLEU-4 | `0.0383` |
-| METEOR | `0.2005` |
-| RadGraph F1 | `0.0941` |
-| RadGraph entity F1 | `0.1819` |
-| RadGraph relation F1 | `0.1652` |
-| CheXpert F1 14-micro | `0.1245` |
-| CheXpert F1 5-micro | `0.2190` |
-| CheXpert F1 14-macro | `0.0443` |
-| CheXpert F1 5-macro | `0.0991` |
+| ROUGE-L | `0.1597` |
+| BLEU-1 | `0.1983` |
+| BLEU-4 | `0.0373` |
+| METEOR | `0.2006` |
+| RadGraph F1 | `0.0793` |
+| RadGraph entity F1 | `0.1467` |
+| RadGraph relation F1 | `0.1279` |
+| CheXpert F1 14-micro | `0.1592` |
+| CheXpert F1 5-micro | `0.1970` |
+| CheXpert F1 14-macro | `0.0693` |
+| CheXpert F1 5-macro | `0.1037` |
 
 ### Findings-Only Frontal Test Studies
 
 | Metric | Value |
 | --- | --- |
 | Number of studies | `2210` |
-| ROUGE-L | `0.1721` |
-| BLEU-1 | `0.2310` |
-| BLEU-4 | `0.0429` |
-| METEOR | `0.2125` |
-| RadGraph F1 | `0.1017` |
-| RadGraph entity F1 | `0.1922` |
-| RadGraph relation F1 | `0.1741` |
-| CheXpert F1 14-micro | `0.1166` |
-| CheXpert F1 5-micro | `0.2071` |
-| CheXpert F1 14-macro | `0.0406` |
-| CheXpert F1 5-macro | `0.0920` |
+| ROUGE-L | `0.1657` |
+| BLEU-1 | `0.2025` |
+| BLEU-4 | `0.0422` |
+| METEOR | `0.2119` |
+| RadGraph F1 | `0.0866` |
+| RadGraph entity F1 | `0.1553` |
+| RadGraph relation F1 | `0.1352` |
+| CheXpert F1 14-micro | `0.1414` |
+| CheXpert F1 5-micro | `0.1866` |
+| CheXpert F1 14-macro | `0.0624` |
+| CheXpert F1 5-macro | `0.0946` |
 
 ### Final Completed Training Results
 
@@ -174,20 +174,20 @@ The final table will be populated when the planned training run is completed. Un
 - Scheduler: `cosine`
 - Warmup steps: `2636`
 - Weight decay: `0.01`
-- Steps completed: `6692`
+- Steps completed: `13384`
 - Planned total steps: `52716`
-- Images seen: `53540`
-- Total training time: `1.0000` hours
+- Images seen: `107082`
+- Total training time: `2.0000` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `0.6296`
-- Validation loss: `2.3133`
+- Final train loss: `2.4148`
+- Validation loss: `1.9625`
 
 ## Status
 
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `12.70%` (`0` / `3` epochs)
+- Training completion toward planned run: `25.39%` (`1` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Notes
