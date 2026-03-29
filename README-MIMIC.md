@@ -98,56 +98,43 @@ print(report)
 
 Frontal-only evaluation using `PA/AP` studies only.
 
-### Current Checkpoint Results
+### Final Completed Training Results
+
+These final-report metrics correspond to the completed training run.
 
 ### All Frontal Test Studies
 
 | Metric | Value |
 | --- | --- |
 | Number of studies | `3041` |
-| ROUGE-L | `0.1645` |
-| BLEU-1 | `0.1938` |
-| BLEU-4 | `0.0394` |
-| METEOR | `0.2192` |
-| RadGraph F1 | `0.0945` |
-| RadGraph entity F1 | `0.1497` |
-| RadGraph relation F1 | `0.1350` |
-| CheXpert F1 14-micro | `0.1571` |
-| CheXpert F1 5-micro | `0.1573` |
-| CheXpert F1 14-macro | `0.0762` |
-| CheXpert F1 5-macro | `0.1068` |
+| ROUGE-L | `0.1653` |
+| BLEU-1 | `0.1916` |
+| BLEU-4 | `0.0386` |
+| METEOR | `0.2202` |
+| RadGraph F1 | `0.0921` |
+| RadGraph entity F1 | `0.1459` |
+| RadGraph relation F1 | `0.1322` |
+| CheXpert F1 14-micro | `0.1565` |
+| CheXpert F1 5-micro | `0.1530` |
+| CheXpert F1 14-macro | `0.0713` |
+| CheXpert F1 5-macro | `0.1007` |
 
 ### Findings-Only Frontal Test Studies
 
 | Metric | Value |
 | --- | --- |
 | Number of studies | `2210` |
-| ROUGE-L | `0.1714` |
-| BLEU-1 | `0.2021` |
-| BLEU-4 | `0.0459` |
-| METEOR | `0.2339` |
-| RadGraph F1 | `0.1026` |
-| RadGraph entity F1 | `0.1605` |
-| RadGraph relation F1 | `0.1434` |
-| CheXpert F1 14-micro | `0.1450` |
-| CheXpert F1 5-micro | `0.1747` |
-| CheXpert F1 14-macro | `0.0749` |
-| CheXpert F1 5-macro | `0.1182` |
-
-### Final Completed Training Results
-
-The final table will be populated when the planned training run is completed. Until then, final-report metrics remain `TBD`.
-
-| Metric | Value |
-| --- | --- |
-| Number of studies | TBD |
-| RadGraph F1 | TBD |
-| RadGraph entity F1 | TBD |
-| RadGraph relation F1 | TBD |
-| CheXpert F1 14-micro | TBD |
-| CheXpert F1 5-micro | TBD |
-| CheXpert F1 14-macro | TBD |
-| CheXpert F1 5-macro | TBD |
+| ROUGE-L | `0.1720` |
+| BLEU-1 | `0.2003` |
+| BLEU-4 | `0.0449` |
+| METEOR | `0.2347` |
+| RadGraph F1 | `0.1000` |
+| RadGraph entity F1 | `0.1577` |
+| RadGraph relation F1 | `0.1413` |
+| CheXpert F1 14-micro | `0.1442` |
+| CheXpert F1 5-micro | `0.1716` |
+| CheXpert F1 14-macro | `0.0700` |
+| CheXpert F1 5-macro | `0.1112` |
 
 ## Data
 
@@ -163,7 +150,7 @@ The final table will be populated when the planned training run is completed. Un
 ## Training Snapshot
 
 - Run: `mimic only`
-- This section describes the current public checkpoint, not the final completed project.
+- This section describes the completed public training run.
 - Method: `lora_adamw`
 - Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
 - Text decoder: `gpt2`
@@ -174,21 +161,21 @@ The final table will be populated when the planned training run is completed. Un
 - Scheduler: `cosine`
 - Warmup steps: `2636`
 - Weight decay: `0.01`
-- Steps completed: `46866`
+- Steps completed: `52709`
 - Planned total steps: `52716`
-- Images seen: `374957`
-- Total training time: `7.0001` hours
+- Images seen: `421707`
+- Total training time: `7.8770` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `2.1600`
-- Validation loss: `1.7540`
+- Final train loss: `1.9587`
+- Validation loss: `1.7493`
 
 ## Status
 
-- Project status: `Training in progress`
-- Release status: `Research preview checkpoint`
-- Current checkpoint status: `Not final`
-- Training completion toward planned run: `88.91%` (`3` / `3` epochs)
-- Current published metrics are intermediate and will change as training continues.
+- Project status: `Training completed`
+- Release status: `Completed training run`
+- Current checkpoint status: `Final completed run`
+- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
+- Current published metrics correspond to the completed training run.
 
 ## Notes
 
