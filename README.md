@@ -52,7 +52,7 @@ from huggingface_hub import snapshot_download
 from safetensors.torch import load_file
 from transformers import AutoTokenizer
 
-repo_dir = Path(snapshot_download("manu02/LAnA"))
+repo_dir = Path(snapshot_download('manu02/LAnA-v4'))
 sys.path.insert(0, str(repo_dir))
 
 from lana_radgen import LanaConfig, LanaForConditionalGeneration
@@ -82,7 +82,7 @@ std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
 
 with torch.no_grad():
-    generated = model.generate(pixel_values=pixel_values, max_new_tokens=128)
+    generated = model.generate(pixel_values=pixel_values, max_new_tokens=150)
 
 report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 print(report)
@@ -98,49 +98,47 @@ print(report)
 
 Frontal-only evaluation using `PA/AP` studies only.
 
-### Final Completed Training Results
+These comparison tables are refreshed across the full LAnA collection whenever any collection model is evaluated.
 
-These final-report metrics correspond to the completed training run.
+### Cross-Model Comparison: All Frontal Test Studies
 
-### All Frontal Test Studies
+| Metric | LAnA | LAnA-MIMIC | LAnA-MIMIC-CHEXPERT | LAnA-v2 | LAnA-v4 |
+| --- | --- | --- | --- | --- | --- |
+| Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` |
+| ROUGE-L | `0.1686` | `0.1653` | `0.1513` | `0.1670` | `0.1392` |
+| BLEU-1 | `0.2091` | `0.1916` | `0.1707` | `0.2174` | `0.1356` |
+| BLEU-4 | `0.0417` | `0.0386` | `0.0357` | `0.0417` | `0.0253` |
+| METEOR | `0.2298` | `0.2202` | `0.2079` | `0.2063` | `0.1348` |
+| RadGraph F1 | `0.1024` | `0.0921` | `0.0918` | `0.1057` | `0.0796` |
+| RadGraph entity F1 | `0.1587` | `0.1459` | `0.1399` | `0.1569` | `0.1001` |
+| RadGraph relation F1 | `0.1443` | `0.1322` | `0.1246` | `0.1474` | `0.0928` |
+| CheXpert F1 14-micro | `0.2116` | `0.1565` | `0.1829` | `0.1401` | `0.1207` |
+| CheXpert F1 5-micro | `0.2512` | `0.1530` | `0.2183` | `0.2506` | `0.0460` |
+| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.0330` |
+| CheXpert F1 5-macro | `0.1644` | `0.1007` | `0.1634` | `0.1004` | `0.0313` |
 
-| Metric | Value |
-| --- | --- |
-| Number of studies | `3041` |
-| ROUGE-L | `0.1513` |
-| BLEU-1 | `0.1707` |
-| BLEU-4 | `0.0357` |
-| METEOR | `0.2079` |
-| RadGraph F1 | `0.0918` |
-| RadGraph entity F1 | `0.1399` |
-| RadGraph relation F1 | `0.1246` |
-| CheXpert F1 14-micro | `0.1829` |
-| CheXpert F1 5-micro | `0.2183` |
-| CheXpert F1 14-macro | `0.1095` |
-| CheXpert F1 5-macro | `0.1634` |
+### Cross-Model Comparison: Findings-Only Frontal Test Studies
 
-### Findings-Only Frontal Test Studies
-
-| Metric | Value |
-| --- | --- |
-| Number of studies | `2210` |
-| ROUGE-L | `0.1576` |
-| BLEU-1 | `0.1754` |
-| BLEU-4 | `0.0405` |
-| METEOR | `0.2207` |
-| RadGraph F1 | `0.1010` |
-| RadGraph entity F1 | `0.1517` |
-| RadGraph relation F1 | `0.1347` |
-| CheXpert F1 14-micro | `0.1651` |
-| CheXpert F1 5-micro | `0.2152` |
-| CheXpert F1 14-macro | `0.1047` |
-| CheXpert F1 5-macro | `0.1611` |
+| Metric | LAnA | LAnA-MIMIC | LAnA-MIMIC-CHEXPERT | LAnA-v2 | LAnA-v4 |
+| --- | --- | --- | --- | --- | --- |
+| Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` |
+| ROUGE-L | `0.1771` | `0.1720` | `0.1576` | `0.1771` | `0.1485` |
+| BLEU-1 | `0.2177` | `0.2003` | `0.1754` | `0.2263` | `0.1486` |
+| BLEU-4 | `0.0484` | `0.0449` | `0.0405` | `0.0487` | `0.0303` |
+| METEOR | `0.2466` | `0.2347` | `0.2207` | `0.2240` | `0.1464` |
+| RadGraph F1 | `0.1119` | `0.1000` | `0.1010` | `0.1181` | `0.0879` |
+| RadGraph entity F1 | `0.1713` | `0.1577` | `0.1517` | `0.1739` | `0.1102` |
+| RadGraph relation F1 | `0.1549` | `0.1413` | `0.1347` | `0.1628` | `0.1019` |
+| CheXpert F1 14-micro | `0.1907` | `0.1442` | `0.1651` | `0.1365` | `0.1513` |
+| CheXpert F1 5-micro | `0.2415` | `0.1716` | `0.2152` | `0.2455` | `0.0421` |
+| CheXpert F1 14-macro | `0.1039` | `0.0700` | `0.1047` | `0.0381` | `0.0362` |
+| CheXpert F1 5-macro | `0.1578` | `0.1112` | `0.1611` | `0.0952` | `0.0300` |
 
 ## Data
 
 - Full project datasets: CheXpert and MIMIC-CXR.
 - Intended project scope: train on curated chest X-ray/report data from both datasets and evaluate on MIMIC-CXR test studies.
-- Current released checkpoint datasets: `CheXpert, MIMIC-CXR` for training and `CheXpert, MIMIC-CXR` for validation.
+- Current released checkpoint datasets: `MIMIC-CXR (findings-only)` for training and `MIMIC-CXR (findings-only)` for validation.
 - Current published evaluation: MIMIC-CXR test split, `frontal-only (PA/AP)` studies.
 
 ## Evaluation
@@ -149,33 +147,34 @@ These final-report metrics correspond to the completed training run.
 
 ## Training Snapshot
 
-- Run: `full_3_epoch_mask_run`
-- This section describes the completed public training run.
-- Method: `lora_adamw`
+- Run: `LAnA-v4`
+- This section describes the current public checkpoint, not the final completed project.
+- Method: `full_adamw`
 - Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
 - Text decoder: `gpt2`
+- Visual projection: `linear`
 - Segmentation encoder: `facebook/dinov3-convnext-small-pretrain-lvd1689m`
 - Image size: `512`
 - Local batch size: `1`
-- Effective global batch size: `8`
+- Effective global batch size: `128`
 - Scheduler: `cosine`
-- Warmup steps: `5114`
+- Warmup steps: `165`
 - Weight decay: `0.01`
-- Steps completed: `102264`
-- Planned total steps: `102276`
-- Images seen: `818196`
-- Total training time: `23.5798` hours
+- Steps completed: `436`
+- Planned total steps: `3297`
+- Images seen: `55878`
+- Total training time: `1.0000` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.1683`
-- Validation loss: `1.3692`
+- Final train loss: `1.7957`
+- Validation loss: `2.6338`
 
 ## Status
 
-- Project status: `Training completed`
-- Release status: `Completed training run`
-- Current checkpoint status: `Final completed run`
-- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
-- Current published metrics correspond to the completed training run.
+- Project status: `Training in progress`
+- Release status: `Research preview checkpoint`
+- Current checkpoint status: `Not final`
+- Training completion toward planned run: `13.25%` (`0` / `3` epochs)
+- Current published metrics are intermediate and will change as training continues.
 
 ## Notes
 
