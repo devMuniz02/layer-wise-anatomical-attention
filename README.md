@@ -102,37 +102,37 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 
 ### Cross-Model Comparison: All Frontal Test Studies
 
-| Metric | LAnA | LAnA-MIMIC | LAnA-MIMIC-CHEXPERT | LAnA-v2 | LAnA-v4 |
-| --- | --- | --- | --- | --- | --- |
-| Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` |
-| ROUGE-L | `0.1686` | `0.1653` | `0.1513` | `0.1670` | `0.1691` |
-| BLEU-1 | `0.2091` | `0.1916` | `0.1707` | `0.2174` | `0.2186` |
-| BLEU-4 | `0.0417` | `0.0386` | `0.0357` | `0.0417` | `0.0418` |
-| METEOR | `0.2298` | `0.2202` | `0.2079` | `0.2063` | `0.1937` |
-| RadGraph F1 | `0.1024` | `0.0921` | `0.0918` | `0.1057` | `0.1130` |
-| RadGraph entity F1 | `0.1587` | `0.1459` | `0.1399` | `0.1569` | `0.1569` |
-| RadGraph relation F1 | `0.1443` | `0.1322` | `0.1246` | `0.1474` | `0.1478` |
-| CheXpert F1 14-micro | `0.2116` | `0.1565` | `0.1829` | `0.1401` | `0.1272` |
-| CheXpert F1 5-micro | `0.2512` | `0.1530` | `0.2183` | `0.2506` | `0.0416` |
-| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.0417` |
-| CheXpert F1 5-macro | `0.1644` | `0.1007` | `0.1634` | `0.1004` | `0.0322` |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` |
+| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | `0.1745` | `0.1556` |
+| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.2045` |
+| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0356` |
+| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.1730` |
+| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | `0.1057` | `0.0939` | `0.0859` |
+| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1587` | `0.1569` | `0.1441` | `0.1337` |
+| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | `0.1474` | `0.1280` | `0.1233` |
+| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.1265` |
+| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.0154` |
+| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.0388` |
+| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.0120` |
 
 ### Cross-Model Comparison: Findings-Only Frontal Test Studies
 
-| Metric | LAnA | LAnA-MIMIC | LAnA-MIMIC-CHEXPERT | LAnA-v2 | LAnA-v4 |
-| --- | --- | --- | --- | --- | --- |
-| Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` |
-| ROUGE-L | `0.1771` | `0.1720` | `0.1576` | `0.1771` | `0.1791` |
-| BLEU-1 | `0.2177` | `0.2003` | `0.1754` | `0.2263` | `0.2351` |
-| BLEU-4 | `0.0484` | `0.0449` | `0.0405` | `0.0487` | `0.0497` |
-| METEOR | `0.2466` | `0.2347` | `0.2207` | `0.2240` | `0.2088` |
-| RadGraph F1 | `0.1119` | `0.1000` | `0.1010` | `0.1181` | `0.1244` |
-| RadGraph entity F1 | `0.1713` | `0.1577` | `0.1517` | `0.1739` | `0.1729` |
-| RadGraph relation F1 | `0.1549` | `0.1413` | `0.1347` | `0.1628` | `0.1627` |
-| CheXpert F1 14-micro | `0.1907` | `0.1442` | `0.1651` | `0.1365` | `0.1592` |
-| CheXpert F1 5-micro | `0.2415` | `0.1716` | `0.2152` | `0.2455` | `0.0419` |
-| CheXpert F1 14-macro | `0.1039` | `0.0700` | `0.1047` | `0.0381` | `0.0458` |
-| CheXpert F1 5-macro | `0.1578` | `0.1112` | `0.1611` | `0.0952` | `0.0319` |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` |
+| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | `0.1848` | `0.1664` |
+| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.2233` |
+| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0429` |
+| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.1903` |
+| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0986` |
+| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.1521` |
+| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | `0.1628` | `0.1405` | `0.1400` |
+| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.1548` |
+| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.0133` |
+| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.0417` |
+| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.0111` |
 
 ## Data
 
@@ -160,20 +160,20 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - Scheduler: `cosine`
 - Warmup steps: `165`
 - Weight decay: `0.01`
-- Steps completed: `867`
+- Steps completed: `1081`
 - Planned total steps: `3297`
-- Images seen: `111141`
-- Total training time: `2.0000` hours
+- Images seen: `138564`
+- Total training time: `2.5000` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `3.1394`
-- Validation loss: `2.0010`
+- Final train loss: `1.8468`
+- Validation loss: `1.8805`
 
 ## Status
 
 - Project status: `Training in progress`
 - Release status: `Research preview checkpoint`
 - Current checkpoint status: `Not final`
-- Training completion toward planned run: `26.36%` (`1` / `3` epochs)
+- Training completion toward planned run: `32.86%` (`1` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Notes
