@@ -20,6 +20,8 @@ metrics:
 
 **Layer-Wise Anatomical Attention model**
 
+> Best current model in this collection: [`manu02/LAnA-v3`](https://huggingface.co/manu02/LAnA-v3)
+
 [![ArXiv](https://img.shields.io/badge/ArXiv-2512.16841-B31B1B?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2512.16841)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-devmuniz-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/devmuniz)
 [![GitHub Profile](https://img.shields.io/badge/GitHub-devMuniz02-181717?logo=github&logoColor=white)](https://github.com/devMuniz02)
@@ -35,64 +37,72 @@ LAnA is a medical report-generation project for chest X-ray images. The complete
 
 The architecture combines a DINOv3 vision encoder, lung and heart segmentation heads, and a GPT-2 decoder modified so each transformer layer receives a different anatomical attention bias derived from the segmentation mask.
 
-## How to Run
-
-Standard `AutoModel.from_pretrained(..., trust_remote_code=True)` loading is currently blocked for this repo because the custom model constructor performs nested pretrained submodel loads.
-Use the verified manual load path below instead: download the HF repo snapshot, import the downloaded package, and load the exported `model.safetensors` directly.
-You must set an `HF_TOKEN` environment variable with permission to access the DINOv3 model repositories used by this project, otherwise the required vision backbones cannot be downloaded.
-
-```python
-from pathlib import Path
-import sys
-
-import numpy as np
-import torch
-from PIL import Image
-from huggingface_hub import snapshot_download
-from safetensors.torch import load_file
-from transformers import AutoTokenizer
-
-repo_dir = Path(snapshot_download('manu02/LAnA-v4'))
-sys.path.insert(0, str(repo_dir))
-
-from lana_radgen import LanaConfig, LanaForConditionalGeneration
-
-config = LanaConfig.from_pretrained(repo_dir)
-config.lung_segmenter_checkpoint = str(repo_dir / "segmenters" / "lung_segmenter_dinounet_finetuned.pth")
-config.heart_segmenter_checkpoint = str(repo_dir / "segmenters" / "heart_segmenter_dinounet_best.pth")
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-model = LanaForConditionalGeneration(config)
-state_dict = load_file(str(repo_dir / "model.safetensors"))
-missing, unexpected = model.load_state_dict(state_dict, strict=True)
-assert not missing and not unexpected
-
-model.tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
-model.move_non_quantized_modules(device)
-model.eval()
-
-image_path = Path("example.png")
-image = Image.open(image_path).convert("RGB")
-image = image.resize((512, 512), resample=Image.BICUBIC)
-array = np.asarray(image, dtype=np.float32) / 255.0
-pixel_values = torch.from_numpy(array).permute(2, 0, 1)
-mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-pixel_values = ((pixel_values - mean) / std).unsqueeze(0).to(device)
-
-with torch.no_grad():
-    generated = model.generate(pixel_values=pixel_values, max_new_tokens=150)
-
-report = model.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
-print(report)
-```
-
 ## Intended Use
 
 - Input: a chest X-ray image resized to `512x512` and normalized with ImageNet mean/std.
 - Output: a generated radiology report.
 - Best fit: research use, report-generation experiments, and anatomical-attention ablations.
+
+## How to Run
+
+New users should prefer the standard Hugging Face flow below.
+The legacy snapshot/manual implementation lives on the `snapshot-legacy` branch for backward compatibility.
+
+### Implementation 1: Standard Hugging Face loading
+
+```python
+import torch
+from PIL import Image
+from transformers import AutoModel, AutoProcessor
+
+repo_id = "manu02/LAnA-v5"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModel.from_pretrained(repo_id, trust_remote_code=True)
+model.move_non_quantized_modules(device)
+model.eval()
+
+image = Image.open("example.png").convert("RGB")
+inputs = processor(images=image, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+with torch.inference_mode():
+    generated = model.generate(**inputs, max_new_tokens=150)
+
+report = processor.batch_decode(generated, skip_special_tokens=True)[0]
+print(report)
+```
+
+Batched inference uses the same path:
+
+```python
+batch = processor(images=[image_a, image_b], return_tensors="pt")
+batch = {name: tensor.to(device) for name, tensor in batch.items()}
+generated = model.generate(**batch, max_new_tokens=150)
+reports = processor.batch_decode(generated, skip_special_tokens=True)
+```
+
+`HF_TOKEN` is optional for this public standard-loading path. If you do not set one, the model still loads,
+but Hugging Face may show lower-rate-limit warnings.
+
+### Legacy snapshot branch
+
+Use the snapshot/manual branch only if you specifically need the older import-based workflow:
+
+- Branch: [`snapshot-legacy`](https://huggingface.co/manu02/LAnA-v5/tree/snapshot-legacy)
+- Download example: `snapshot_download("manu02/LAnA-v5", revision="snapshot-legacy")`
+
+## Licensing and Redistribution Notice
+
+This checkpoint bundles or derives from Meta DINOv3 model materials. Redistribution of those components must follow
+the DINOv3 license terms included in this repository. The project code remains available under the repository's own
+license, but the full packaged checkpoint should not be treated as MIT-only.
+
+## Research and Safety Disclaimer
+
+This model is intended for research and educational use only. It is not a medical device, has not been validated
+for clinical deployment, and should not be used as a substitute for professional radiology review.
 
 ## MIMIC Test Results
 
@@ -102,39 +112,39 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 
 ### Cross-Model Comparison: All Frontal Test Studies
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 (Model still training) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
+| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Model still training` |
 | Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` |
-| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | `0.1745` | `0.1675` |
-| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.2244` |
-| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0441` |
-| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.2002` |
-| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | `0.1057` | `0.0939` | `0.0794` |
-| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1587` | `0.1569` | `0.1441` | `0.1437` |
-| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | `0.1474` | `0.1280` | `0.1293` |
-| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.2196` |
-| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.0538` |
-| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.0724` |
-| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.0333` |
+| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | `0.1745` | `0.0199` |
+| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.0000` |
+| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0000` |
+| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.0089` |
+| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | `0.1057` | `0.0939` | `0.0000` |
+| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1587` | `0.1569` | `0.1441` | `0.0000` |
+| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | `0.1474` | `0.1280` | `0.0000` |
+| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.2191` |
+| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.0018` |
+| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.0395` |
+| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.0018` |
 
 ### Cross-Model Comparison: Findings-Only Frontal Test Studies
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 (Model still training) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
+| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Model still training` |
 | Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` |
-| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | `0.1848` | `0.1753` |
-| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.2337` |
-| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0509` |
-| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.2137` |
-| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0906` |
-| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.1566` |
-| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | `0.1628` | `0.1405` | `0.1410` |
-| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.2205` |
-| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.0555` |
-| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.0714` |
-| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.0342` |
+| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | `0.1848` | `0.0208` |
+| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.0000` |
+| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0000` |
+| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.0093` |
+| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0000` |
+| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.0000` |
+| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | `0.1628` | `0.1405` | `0.0000` |
+| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.1779` |
+| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.0029` |
+| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.0323` |
+| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.0026` |
 
 ## Data
 
@@ -155,11 +165,12 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - `LAnA-v2`: This version keeps the same training setup as `LAnA`, but increases the effective global batch size from `16` to `128`.
 - `LAnA-v3`: This version keeps the same training setup as `LAnA`, including the effective global batch size of `16`, but changes how EOS is handled so training and generation follow the same behavior. The model no longer uses the EOS token during training, and generation remained greedy without stopping when an EOS token was produced. In the previous setup, decoding was also greedy, stopped at EOS, and used a maximum of `128` new tokens.
 - `LAnA-v4`: This version keeps the same decoding behavior as `LAnA-v3`, but increases the effective global batch size from `16` to `128`.
+- `LAnA-v5`: This version keeps the same training setup as `LAnA-v3`, but switches to the legacy `CXR-Findings-AI` generation behavior, skips five vision-prefix tokens, and uses the older Gaussian anatomical attention path.
 
 ## Training Snapshot
 
-- Run: `LAnA-v4`
-- This section describes the completed public training run.
+- Run: `LAnA-v5`
+- This section describes the current public checkpoint, not the final completed project.
 - Method: `full_adamw`
 - Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
 - Text decoder: `gpt2`
@@ -167,24 +178,24 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - Segmentation encoder: `facebook/dinov3-convnext-small-pretrain-lvd1689m`
 - Image size: `512`
 - Local batch size: `1`
-- Effective global batch size: `128`
+- Effective global batch size: `16`
 - Scheduler: `cosine`
-- Warmup steps: `165`
+- Warmup steps: `1318`
 - Weight decay: `0.01`
-- Steps completed: `3289`
-- Planned total steps: `3297`
-- Images seen: `421707`
-- Total training time: `8.0982` hours
+- Steps completed: `482`
+- Planned total steps: `26358`
+- Images seen: `7724`
+- Total training time: `0.1667` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.9641`
-- Validation loss: `1.6446`
+- Final train loss: `8.1020`
+- Validation loss: `8.1601`
 
 ## Status
 
-- Project status: `Training completed`
-- Release status: `Completed training run`
-- Current checkpoint status: `Final completed run`
-- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
+- Project status: `Training in progress`
+- Release status: `Research preview checkpoint`
+- Current checkpoint status: `Not final`
+- Training completion toward planned run: `1.83%` (`0` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Notes
