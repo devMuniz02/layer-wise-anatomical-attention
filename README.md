@@ -112,39 +112,39 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 
 ### Cross-Model Comparison: All Frontal Test Studies
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 (Model still training) |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Model still training` |
+| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
 | Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` |
-| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | `0.1745` | `0.1705` |
-| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.2738` |
-| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0504` |
-| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.2618` |
-| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | `0.1057` | `0.0939` | `0.0865` |
-| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1587` | `0.1569` | `0.1441` | `0.1494` |
-| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | `0.1474` | `0.1280` | `0.1324` |
-| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.3529` |
-| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.3780` |
-| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.1757` |
-| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.2650` |
+| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | `0.1745` | `0.1702` |
+| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.2726` |
+| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0503` |
+| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.2607` |
+| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | `0.1057` | `0.0939` | `0.0853` |
+| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1587` | `0.1569` | `0.1441` | `0.1481` |
+| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | `0.1474` | `0.1280` | `0.1308` |
+| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.3552` |
+| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.3777` |
+| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.1790` |
+| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.2647` |
 
 ### Cross-Model Comparison: Findings-Only Frontal Test Studies
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 (Model still training) |
+| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v5 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Model still training` |
+| Run status | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
 | Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` |
-| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | `0.1848` | `0.1787` |
-| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.2790` |
-| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0576` |
-| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.2776` |
-| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0951` |
-| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.1595` |
-| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | `0.1628` | `0.1405` | `0.1412` |
-| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.3156` |
-| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.3369` |
-| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.1614` |
-| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.2365` |
+| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | `0.1848` | `0.1781` |
+| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.2774` |
+| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0575` |
+| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.2760` |
+| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0938` |
+| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.1580` |
+| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | `0.1628` | `0.1405` | `0.1395` |
+| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.3173` |
+| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.3372` |
+| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.1632` |
+| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.2343` |
 
 ## Data
 
@@ -170,7 +170,7 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 ## Training Snapshot
 
 - Run: `LAnA-v5`
-- This section describes the current public checkpoint, not the final completed project.
+- This section describes the completed public training run.
 - Method: `full_adamw`
 - Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
 - Text decoder: `gpt2`
@@ -182,20 +182,20 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - Scheduler: `cosine`
 - Warmup steps: `1318`
 - Weight decay: `0.01`
-- Steps completed: `24680`
+- Steps completed: `26351`
 - Planned total steps: `26358`
-- Images seen: `394963`
-- Total training time: `8.1667` hours
+- Images seen: `421707`
+- Total training time: `8.6900` hours
 - Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `1.2060`
-- Validation loss: `1.5180`
+- Final train loss: `1.8862`
+- Validation loss: `1.5179`
 
 ## Status
 
-- Project status: `Training in progress`
-- Release status: `Research preview checkpoint`
-- Current checkpoint status: `Not final`
-- Training completion toward planned run: `93.66%` (`3` / `3` epochs)
+- Project status: `Training completed`
+- Release status: `Completed training run`
+- Current checkpoint status: `Final completed run`
+- Training completion toward planned run: `100.00%` (`3` / `3` epochs)
 - Current published metrics are intermediate and will change as training continues.
 
 ## Notes
