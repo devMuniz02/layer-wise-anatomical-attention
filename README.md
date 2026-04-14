@@ -1,21 +1,3 @@
----
-license: mit
-library_name: transformers
-pipeline_tag: image-to-text
-tags:
-  - medical-ai
-  - radiology
-  - chest-xray
-  - report-generation
-  - segmentation
-  - anatomical-attention
-metrics:
-  - BLEU
-  - METEOR
-  - ROUGE
-  - CIDEr
----
-
 # LAnA
 
 **Layer-Wise Anatomical Attention model**
