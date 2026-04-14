@@ -144,37 +144,6 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - `LAnA-v5`: This version uses the training recipe from the original `LAnA` paper, while switching to the legacy [`CXR-Findings-AI`](https://huggingface.co/spaces/manu02/CXR-Findings-AI) generation behavior.
 - `LAnA-Arxiv`: This model is the report-generation model created in the arXiv paper, packaged locally with its original legacy generation code.
 
-## Training Snapshot
-
-- Run: `LAnA`
-- This section describes the current public checkpoint, not the final completed project.
-- Method: `full_adamw`
-- Vision encoder: `facebook/dinov3-vits16-pretrain-lvd1689m`
-- Text decoder: `gpt2`
-- Visual projection: `mlp4`
-- Segmentation encoder: `facebook/dinov3-convnext-small-pretrain-lvd1689m`
-- Image size: `512`
-- Local batch size: `1`
-- Effective global batch size: `16`
-- Scheduler: `cosine`
-- Warmup steps: `1318`
-- Weight decay: `0.01`
-- Steps completed: `3127`
-- Planned total steps: `26358`
-- Images seen: `50046`
-- Total training time: `1.0000` hours
-- Hardware: `NVIDIA GeForce RTX 5070`
-- Final train loss: `2.9207`
-- Validation loss: `2.6414`
-
-## Status
-
-- Project status: `Training in progress`
-- Release status: `Research preview checkpoint`
-- Current checkpoint status: `Not final`
-- Training completion toward planned run: `11.87%` (`0` / `3` epochs)
-- Current published metrics are intermediate and will change as training continues.
-
 ## Notes
 
 - Set `HF_TOKEN` with permission to access the DINOv3 repositories required by this model before downloading or running inference.
