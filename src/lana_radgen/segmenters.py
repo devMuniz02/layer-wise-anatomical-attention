@@ -3,9 +3,9 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel
+from transformers import AutoConfig, AutoModel
 
-from .attention.layerwise_anatomical_attention import build_layerwise_attention_bias
+from .layerwise_anatomical_attention import build_layerwise_attention_bias
 
 LOGGER = logging.getLogger(__name__)
 
@@ -16,9 +16,12 @@ def _freeze_module(module: nn.Module) -> None:
 
 
 class _DinoUNetLung(nn.Module):
-    def __init__(self, model_name: str, freeze: bool = True):
+    def __init__(self, model_name: str, freeze: bool = True, load_pretrained: bool = True):
         super().__init__()
-        self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+        if load_pretrained:
+            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+        else:
+            self.encoder = AutoModel.from_config(AutoConfig.from_pretrained(model_name, trust_remote_code=True), trust_remote_code=True)
         self.channel_adapter = nn.Conv2d(768, 512, kernel_size=1)
         self.decoder = nn.Sequential(
             nn.Conv2d(512, 256, 3, padding=1),
@@ -42,9 +45,12 @@ class _DinoUNetLung(nn.Module):
 
 
 class _DinoUNetHeart(nn.Module):
-    def __init__(self, model_name: str, freeze: bool = True):
+    def __init__(self, model_name: str, freeze: bool = True, load_pretrained: bool = True):
         super().__init__()
-        self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+        if load_pretrained:
+            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+        else:
+            self.encoder = AutoModel.from_config(AutoConfig.from_pretrained(model_name, trust_remote_code=True), trust_remote_code=True)
         self.adapter = nn.Conv2d(768, 512, 1)
         self.decoder = nn.Sequential(
             nn.Conv2d(512, 256, 3, padding=1),
@@ -75,12 +81,18 @@ class AnatomicalSegmenter(nn.Module):
         freeze: bool = True,
         lung_checkpoint: str = "",
         heart_checkpoint: str = "",
+        load_pretrained: bool = True,
+        assume_weights_from_model_state: bool = False,
     ):
         super().__init__()
-        self.lung_model = _DinoUNetLung(model_name=model_name, freeze=freeze)
-        self.heart_model = _DinoUNetHeart(model_name=model_name, freeze=freeze)
-        self.loaded_lung_checkpoint = self._load_submodule(self.lung_model, lung_checkpoint, "lung")
-        self.loaded_heart_checkpoint = self._load_submodule(self.heart_model, heart_checkpoint, "heart")
+        self.lung_model = _DinoUNetLung(model_name=model_name, freeze=freeze, load_pretrained=load_pretrained)
+        self.heart_model = _DinoUNetHeart(model_name=model_name, freeze=freeze, load_pretrained=load_pretrained)
+        if assume_weights_from_model_state:
+            self.loaded_lung_checkpoint = True
+            self.loaded_heart_checkpoint = True
+        else:
+            self.loaded_lung_checkpoint = self._load_submodule(self.lung_model, lung_checkpoint, "lung")
+            self.loaded_heart_checkpoint = self._load_submodule(self.heart_model, heart_checkpoint, "heart")
 
     @staticmethod
     def _load_submodule(module: nn.Module, checkpoint_path: str, label: str) -> bool:
@@ -90,6 +102,12 @@ class AnatomicalSegmenter(nn.Module):
         if not path.exists():
             LOGGER.warning("Requested %s segmenter checkpoint does not exist: %s", label, path)
             return False
+        if any(getattr(param, "is_meta", False) for param in module.parameters()):
+            LOGGER.info(
+                "Deferring %s segmenter checkpoint preload for meta-initialized module; packaged model weights will finish loading it.",
+                label,
+            )
+            return True
         state = torch.load(path, map_location="cpu", weights_only=False)
         if isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]
@@ -102,7 +120,7 @@ class AnatomicalSegmenter(nn.Module):
         return self.loaded_lung_checkpoint or self.loaded_heart_checkpoint
 
     @torch.no_grad()
-    def forward(self, pixel_values: torch.Tensor, num_layers: int, target_tokens: int, strength: float) -> torch.Tensor | None:
+    def predict_mask(self, pixel_values: torch.Tensor) -> torch.Tensor | None:
         if not self.has_any_checkpoint:
             return None
 
@@ -114,7 +132,13 @@ class AnatomicalSegmenter(nn.Module):
         if not masks:
             return None
 
-        combined_mask = torch.clamp(sum(masks), 0.0, 1.0)
+        return torch.clamp(sum(masks), 0.0, 1.0)
+
+    @torch.no_grad()
+    def forward(self, pixel_values: torch.Tensor, num_layers: int, target_tokens: int, strength: float) -> torch.Tensor | None:
+        combined_mask = self.predict_mask(pixel_values)
+        if combined_mask is None:
+            return None
         return build_layerwise_attention_bias(
             masks=combined_mask,
             num_layers=num_layers,

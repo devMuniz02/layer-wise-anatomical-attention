@@ -58,6 +58,9 @@ Thumbs.db
 temp*.ipynb
 temp*.py
 .tmp/
+.cache/
+.plan_tmp/
+bert-base-uncased/
 pytest-cache-files-*/
 
 # Ignore pytest cache
@@ -68,6 +71,10 @@ checkpoints/
 deletions/
 processed/
 artifacts/
+artifacts/*/.hf_eval_publish/
+artifacts/*/.hf_model_card_publish/
+artifacts/*/.hf_modules_cache_check/
+artifacts/*/checkpoints/**/tokenizer/
 wandb/
 *.pyc
 *.pyo

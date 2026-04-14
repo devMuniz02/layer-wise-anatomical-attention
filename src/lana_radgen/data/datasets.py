@@ -26,6 +26,8 @@ class ResizeCachedReportDataset(Dataset):
         image_std=None,
         image_size: Optional[int] = None,
         max_text_length: Optional[int] = None,
+        resize_loaded_images: bool = True,
+        prepend_bos_token: bool = True,
     ):
         self.manifest = manifest.reset_index(drop=True)
         self.tokenizer = tokenizer
@@ -33,15 +35,17 @@ class ResizeCachedReportDataset(Dataset):
         self.image_std = torch.tensor(image_std or [0.229, 0.224, 0.225]).view(3, 1, 1)
         self.image_size = image_size
         self.max_text_length = max_text_length
-        self.bos_token_id = getattr(tokenizer, "bos_token_id", None)
-        self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
+        self.resize_loaded_images = resize_loaded_images
+        bos_token_id = getattr(tokenizer, "bos_token_id", None)
+        self.bos_token_id = bos_token_id if prepend_bos_token else None
+        self._tokenized_reports = [self._tokenize_report(str(text)) for text in self.manifest["report_text"].tolist()]
 
     def __len__(self) -> int:
         return len(self.manifest)
 
     def _load_png_tensor(self, path: str) -> torch.Tensor:
         image = Image.open(path).convert("RGB")
-        if self.image_size is not None:
+        if self.resize_loaded_images and self.image_size is not None:
             image = image.resize((self.image_size, self.image_size), resample=Image.BICUBIC)
         array = np.asarray(image, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(array).permute(2, 0, 1)
@@ -51,7 +55,7 @@ class ResizeCachedReportDataset(Dataset):
         if not path:
             return torch.ones(1, fallback_shape[-2], fallback_shape[-1], dtype=torch.float32)
         image = Image.open(path).convert("L")
-        if self.image_size is not None:
+        if self.resize_loaded_images and self.image_size is not None:
             image = image.resize((self.image_size, self.image_size), resample=Image.NEAREST)
         array = np.asarray(image, dtype=np.float32) / 255.0
         return torch.from_numpy(array).unsqueeze(0)
@@ -59,7 +63,7 @@ class ResizeCachedReportDataset(Dataset):
     def _tokenize_report(self, report_text: str) -> Dict[str, torch.Tensor]:
         normalized = report_text.rstrip() + "\n"
         token_limit = self.max_text_length
-        reserve = int(self.bos_token_id is not None) + int(self.eos_token_id is not None)
+        reserve = int(self.bos_token_id is not None)
         if token_limit is not None:
             token_limit = max(1, token_limit - reserve)
         tokenized = self.tokenizer(
@@ -74,24 +78,14 @@ class ResizeCachedReportDataset(Dataset):
         attention_mask = tokenized["attention_mask"].squeeze(0)
 
         prefix = []
-        suffix = []
         if self.bos_token_id is not None:
             prefix.append(self.bos_token_id)
-        if self.eos_token_id is not None:
-            suffix.append(self.eos_token_id)
 
         if prefix:
             prefix_tensor = torch.tensor(prefix, dtype=input_ids.dtype)
             input_ids = torch.cat([prefix_tensor, input_ids], dim=0)
             attention_mask = torch.cat(
                 [torch.ones(len(prefix), dtype=attention_mask.dtype), attention_mask],
-                dim=0,
-            )
-        if suffix:
-            suffix_tensor = torch.tensor(suffix, dtype=input_ids.dtype)
-            input_ids = torch.cat([input_ids, suffix_tensor], dim=0)
-            attention_mask = torch.cat(
-                [attention_mask, torch.ones(len(suffix), dtype=attention_mask.dtype)],
                 dim=0,
             )
 
@@ -111,7 +105,7 @@ class ResizeCachedReportDataset(Dataset):
             except (FileNotFoundError, OSError, UnidentifiedImageError, ValueError) as exc:
                 LOGGER.warning("Skipping unreadable sample at %s: %s", row.get("processed_image_path", "<unknown>"), exc)
                 continue
-            tokenized = self._tokenize_report(str(row["report_text"]))
+            tokenized = self._tokenized_reports[current_idx]
             return {
                 "pixel_values": pixel_values,
                 "anatomical_masks": mask,

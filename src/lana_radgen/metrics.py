@@ -2,9 +2,23 @@ import os
 import math
 import re
 from collections import Counter
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
+import torch
+import torch.nn as nn
 from transformers import BertTokenizer
+from transformers import AutoConfig, AutoModel
+from sklearn.metrics import classification_report
+
+try:
+    from huggingface_hub import hf_hub_download
+except Exception as chexbert_hf_import_error:  # pragma: no cover - optional dependency path
+    hf_hub_download = None
+    _CHEXBERT_HF_IMPORT_ERROR = chexbert_hf_import_error
+else:  # pragma: no cover - optional dependency path
+    _CHEXBERT_HF_IMPORT_ERROR = None
 
 try:
     from radgraph import F1RadGraph
@@ -13,6 +27,14 @@ except Exception as radgraph_import_error:  # pragma: no cover - optional depend
     _RADGRAPH_IMPORT_ERROR = radgraph_import_error
 else:  # pragma: no cover - optional dependency path
     _RADGRAPH_IMPORT_ERROR = None
+
+try:
+    from f1chexbert.f1chexbert import CACHE_DIR as _F1CHEXBERT_CACHE_DIR
+except Exception as chexbert_import_error:  # pragma: no cover - optional dependency path
+    _F1CHEXBERT_CACHE_DIR = None
+    _CHEXBERT_IMPORT_ERROR = chexbert_import_error
+else:  # pragma: no cover - optional dependency path
+    _CHEXBERT_IMPORT_ERROR = None
 
 
 if not hasattr(BertTokenizer, "encode_plus"):  # pragma: no cover - compatibility shim for radgraph on Transformers 5.x
@@ -50,66 +72,310 @@ CHEXPERT_14_LABELS = [
 ]
 
 CHEXPERT_5_LABELS = [
-    "Atelectasis",
     "Cardiomegaly",
-    "Consolidation",
     "Edema",
+    "Consolidation",
+    "Atelectasis",
     "Pleural Effusion",
 ]
 
-CHEXPERT_LABEL_PATTERNS = {
-    "Enlarged Cardiomediastinum": [
-        r"\benlarged cardiomediastinum\b",
-        r"\bcardiomediastinal silhouette is enlarged\b",
-        r"\bcardiomediastinal enlargement\b",
-        r"\bmediastinal widening\b",
-    ],
-    "Cardiomegaly": [r"\bcardiomegaly\b", r"\benlarged cardiac silhouette\b", r"\bheart size is enlarged\b"],
-    "Lung Opacity": [
-        r"\blung opacity\b",
-        r"\bairspace opacity\b",
-        r"\bairspace opacities\b",
-        r"\bopacity in the (?:right|left|upper|lower|mid)\b",
-        r"\bopacification\b",
-        r"\bpatchy opacity\b",
-        r"\bpatchy opacities\b",
-        r"\bfocal opacity\b",
-    ],
-    "Lung Lesion": [r"\blung lesion\b", r"\bpulmonary nodule\b", r"\bpulmonary mass\b", r"\blung mass\b", r"\blung nodule\b"],
-    "Edema": [r"\bedema\b", r"\bpulmonary edema\b", r"\bvascular congestion\b", r"\binterstitial edema\b"],
-    "Consolidation": [r"\bconsolidation\b", r"\bconsolidative\b"],
-    "Pneumonia": [r"\bpneumonia\b", r"\binfectious infiltrate\b"],
-    "Atelectasis": [r"\batelectasis\b", r"\bsubsegmental atelectatic\b", r"\bplate-like atelectatic\b"],
-    "Pneumothorax": [r"\bpneumothorax\b"],
-    "Pleural Effusion": [r"\bpleural effusion\b", r"\bpleural effusions\b", r"\beffusion\b"],
-    "Pleural Other": [r"\bpleural thickening\b", r"\bpleural plaques?\b", r"\bpleural abnormality\b"],
-    "Fracture": [r"\bfracture\b", r"\bfractures\b", r"\bfractured\b"],
-    "Support Devices": [
-        r"\bsupport devices?\b",
-        r"\bpacemaker\b",
-        r"\bpicc\b",
-        r"\bport-a-cath\b",
-        r"\bportacath\b",
-        r"\bendotracheal tube\b",
-        r"\bet tube\b",
-        r"\benteric tube\b",
-        r"\bng tube\b",
-        r"\bchest tube\b",
-        r"\bcentral venous catheter\b",
-        r"\bcatheter tip\b",
-        r"\bline tip\b",
-        r"\bpostoperative changes\b",
-    ],
-    "No Finding": [r"\bno acute cardiopulmonary abnormality\b", r"\bno acute disease\b", r"\bno focal airspace disease\b", r"\bno finding\b"],
-}
+RADGRAPH_MODEL_TYPE = "radgraph-xl"
+RADGRAPH_TOKENIZER_MODEL_DIRNAME = "models--microsoft--BiomedVLP-CXR-BERT-general"
+CHEXBERT_BERT_MODEL_DIRNAME = "models--bert-base-uncased"
+CHEXBERT_REPO_ID = "StanfordAIMI/RRG_scorers"
+CHEXBERT_WEIGHTS_FILENAME = "chexbert.pth"
+
+_CHEXBERT_SCORER = None
 
 
 def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
+def _path_has_files(path: Path | None) -> bool:
+    if path is None or not path.exists() or not path.is_dir():
+        return False
+    try:
+        next(path.iterdir())
+    except (OSError, StopIteration):
+        return False
+    return True
+
+
+def _path_exists(path: Path | None) -> bool:
+    if path is None:
+        return False
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
+def _candidate_hf_cache_roots() -> List[Path]:
+    candidates: List[Path] = []
+    env_hf_home = os.getenv("HF_HOME")
+    env_hub_cache = os.getenv("HUGGINGFACE_HUB_CACHE")
+    env_local_app_data = os.getenv("LOCALAPPDATA")
+
+    if env_hub_cache:
+        candidates.append(Path(env_hub_cache))
+    if env_hf_home:
+        candidates.append(Path(env_hf_home) / "hub")
+    if env_local_app_data:
+        candidates.append(Path(env_local_app_data) / "huggingface" / "hub")
+    candidates.append(Path.home() / ".cache" / "huggingface" / "hub")
+
+    unique_candidates: List[Path] = []
+    seen = set()
+    for candidate in candidates:
+        normalized = str(candidate)
+        if normalized not in seen:
+            unique_candidates.append(candidate)
+            seen.add(normalized)
+    return unique_candidates
+
+
+def _resolve_hf_snapshot_dir(model_dirname: str) -> Path | None:
+    for cache_root in [Path(__file__).resolve().parents[2] / ".cache" / "huggingface" / "hub", *_candidate_hf_cache_roots()]:
+        model_root = cache_root / model_dirname
+        if not _path_has_files(model_root):
+            continue
+        snapshots_dir = model_root / "snapshots"
+        if _path_has_files(snapshots_dir):
+            for snapshot_dir in sorted(snapshots_dir.iterdir(), reverse=True):
+                if _path_has_files(snapshot_dir):
+                    return snapshot_dir
+        return model_root
+    return None
+
+
+def _resolve_radgraph_runtime_paths(model_type: str = RADGRAPH_MODEL_TYPE) -> tuple[Path, Path | None, bool]:
+    env_model_cache_dir = os.getenv("LANA_RADGRAPH_MODEL_CACHE_DIR")
+    env_tokenizer_cache_dir = os.getenv("LANA_RADGRAPH_TOKENIZER_CACHE_DIR")
+    env_hf_cache_dir = os.getenv("LANA_HF_CACHE_DIR")
+    repo_root = Path(__file__).resolve().parents[2]
+    workspace_model_cache_dir = repo_root / ".cache" / "radgraph"
+    workspace_tokenizer_cache_dir = repo_root / ".cache" / "huggingface" / "hub"
+
+    if env_model_cache_dir:
+        model_cache_dir = Path(env_model_cache_dir)
+    else:
+        model_cache_dir = workspace_model_cache_dir
+
+    tokenizer_cache_candidates: List[Path] = []
+    if env_tokenizer_cache_dir:
+        tokenizer_cache_candidates.append(Path(env_tokenizer_cache_dir))
+    if env_hf_cache_dir:
+        tokenizer_cache_candidates.append(Path(env_hf_cache_dir))
+    tokenizer_cache_candidates.append(workspace_tokenizer_cache_dir)
+    tokenizer_cache_candidates.extend(_candidate_hf_cache_roots())
+
+    tokenizer_cache_dir = None
+    tokenizer_ready = False
+    for candidate in tokenizer_cache_candidates:
+        if _path_has_files(candidate / RADGRAPH_TOKENIZER_MODEL_DIRNAME):
+            tokenizer_cache_dir = candidate
+            tokenizer_ready = True
+            break
+
+    model_ready = _path_has_files(model_cache_dir / model_type)
+    offline_ready = model_ready and tokenizer_ready
+    return model_cache_dir, tokenizer_cache_dir, offline_ready
+
+
+def _resolve_chexbert_runtime_paths() -> tuple[str | Path, str | Path, Path, bool]:
+    env_tokenizer_dir = os.getenv("LANA_CHEXPERT_TOKENIZER_DIR")
+    env_config_dir = os.getenv("LANA_CHEXPERT_CONFIG_DIR")
+    env_weights_path = os.getenv("LANA_CHEXPERT_WEIGHTS_PATH")
+    repo_root = Path(__file__).resolve().parents[2]
+
+    tokenizer_dir = Path(env_tokenizer_dir) if env_tokenizer_dir else _resolve_hf_snapshot_dir(CHEXBERT_BERT_MODEL_DIRNAME)
+    config_dir = Path(env_config_dir) if env_config_dir else tokenizer_dir
+
+    candidate_weight_paths: List[Path] = []
+    if env_weights_path:
+        candidate_weight_paths.append(Path(env_weights_path))
+    candidate_weight_paths.append(repo_root / ".cache" / "chexbert" / CHEXBERT_WEIGHTS_FILENAME)
+    if _F1CHEXBERT_CACHE_DIR:
+        candidate_weight_paths.append(Path(_F1CHEXBERT_CACHE_DIR) / CHEXBERT_WEIGHTS_FILENAME)
+
+    weights_path = candidate_weight_paths[0]
+    for candidate in candidate_weight_paths:
+        if _path_exists(candidate):
+            weights_path = candidate
+            break
+
+    tokenizer_source: str | Path = tokenizer_dir if tokenizer_dir is not None else "bert-base-uncased"
+    config_source: str | Path = config_dir if config_dir is not None else tokenizer_source
+    offline_ready = tokenizer_dir is not None and _path_exists(weights_path)
+    return tokenizer_source, config_source, weights_path, offline_ready
+
+
+@contextmanager
+def _temporary_env(overrides: Dict[str, str]):
+    original_values = {key: os.environ.get(key) for key in overrides}
+    try:
+        for key, value in overrides.items():
+            os.environ[key] = value
+        yield
+    finally:
+        for key, value in original_values.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def _tokenize(text: str) -> List[str]:
     return re.findall(r"\w+", _normalize_text(text))
+
+
+def _generate_attention_masks(batch: torch.Tensor, source_lengths: Sequence[int], device: torch.device) -> torch.Tensor:
+    masks = torch.ones(batch.size(0), batch.size(1), dtype=torch.float)
+    for idx, src_len in enumerate(source_lengths):
+        masks[idx, src_len:] = 0
+    return masks.to(device)
+
+
+def _tokenize_reports_for_chexbert(reports: Sequence[str], tokenizer: BertTokenizer) -> List[List[int]]:
+    tokenized_reports: List[List[int]] = []
+    for report in reports:
+        normalized = re.sub(r"\s+", " ", (report or "").strip().replace("\n", " "))
+        tokenized = tokenizer.tokenize(normalized)
+        if tokenized:
+            token_ids = tokenizer.convert_tokens_to_ids(tokenized)
+            encoded = tokenizer.build_inputs_with_special_tokens(token_ids)
+            if len(encoded) > 512:
+                encoded = encoded[:511] + [tokenizer.sep_token_id]
+            tokenized_reports.append(encoded)
+        else:
+            tokenized_reports.append([tokenizer.cls_token_id, tokenizer.sep_token_id])
+    return tokenized_reports
+
+
+class _CheXbertLabeler(nn.Module):
+    def __init__(self, config_source: str | Path, local_files_only: bool):
+        super().__init__()
+        config = AutoConfig.from_pretrained(str(config_source), local_files_only=local_files_only)
+        self.bert = AutoModel.from_config(config)
+        self.dropout = nn.Dropout(0.1)
+        hidden_size = self.bert.pooler.dense.in_features
+        self.linear_heads = nn.ModuleList([nn.Linear(hidden_size, 4, bias=True) for _ in range(13)])
+        self.linear_heads.append(nn.Linear(hidden_size, 2, bias=True))
+
+    def forward(self, source_padded: torch.Tensor, attention_mask: torch.Tensor) -> List[torch.Tensor]:
+        final_hidden = self.bert(source_padded, attention_mask=attention_mask)[0]
+        cls_hidden = final_hidden[:, 0, :].squeeze(dim=1)
+        cls_hidden = self.dropout(cls_hidden)
+        return [head(cls_hidden) for head in self.linear_heads]
+
+
+class _CheXbertScorer:
+    def __init__(self, device=None):
+        if _CHEXBERT_IMPORT_ERROR is not None:
+            raise RuntimeError(f"f1chexbert import unavailable: {_CHEXBERT_IMPORT_ERROR!r}")
+
+        if device is None:
+            device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = torch.device(device)
+
+        tokenizer_source, config_source, weights_path, offline_ready = _resolve_chexbert_runtime_paths()
+        local_files_only = offline_ready or isinstance(tokenizer_source, Path)
+        self.tokenizer = BertTokenizer.from_pretrained(str(tokenizer_source), local_files_only=local_files_only)
+        self.model = _CheXbertLabeler(config_source=config_source, local_files_only=local_files_only)
+
+        checkpoint_path = weights_path
+        if not _path_exists(checkpoint_path):
+            if hf_hub_download is None:
+                raise RuntimeError(f"CheXbert weights unavailable and huggingface_hub import failed: {_CHEXBERT_HF_IMPORT_ERROR!r}")
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint_path = Path(
+                hf_hub_download(
+                    repo_id=CHEXBERT_REPO_ID,
+                    filename=CHEXBERT_WEIGHTS_FILENAME,
+                    local_dir=str(checkpoint_path.parent),
+                    local_dir_use_symlinks=False,
+                )
+            )
+
+        state_dict = torch.load(checkpoint_path, map_location=self.device)["model_state_dict"]
+        cleaned_state_dict = {}
+        for key, value in state_dict.items():
+            cleaned_state_dict[key.replace("module.", "")] = value
+
+        self.model.load_state_dict(cleaned_state_dict, strict=False)
+        self.model = self.model.to(self.device).eval()
+        for _, param in self.model.named_parameters():
+            param.requires_grad = False
+
+    @torch.inference_mode()
+    def label_reports(self, reports: Sequence[str]) -> List[List[int]]:
+        encoded_reports = _tokenize_reports_for_chexbert(reports, self.tokenizer)
+        labels: List[List[int]] = []
+        for encoded in encoded_reports:
+            batch = torch.LongTensor([encoded])
+            source_lengths = [len(encoded)]
+            attention_mask = _generate_attention_masks(batch, source_lengths, self.device)
+            outputs = self.model(batch.to(self.device), attention_mask)
+            classes = [head.argmax(dim=1).item() for head in outputs]
+            label_vector = []
+            for predicted_class in classes:
+                if predicted_class == 0:
+                    label_vector.append(0)
+                elif predicted_class == 2:
+                    label_vector.append(0)
+                elif predicted_class == 1:
+                    label_vector.append(1)
+                elif predicted_class == 3:
+                    label_vector.append(1)
+                else:
+                    label_vector.append(0)
+            labels.append(label_vector)
+        return labels
+
+
+def _get_chexbert_scorer() -> _CheXbertScorer:
+    global _CHEXBERT_SCORER
+    if _CHEXBERT_SCORER is None:
+        _CHEXBERT_SCORER = _CheXbertScorer()
+    return _CHEXBERT_SCORER
+
+
+def _compute_chexpert_metrics_from_label_vectors(
+    predicted_label_vectors: Sequence[Sequence[int]],
+    reference_label_vectors: Sequence[Sequence[int]],
+) -> Dict[str, object]:
+    report_14 = classification_report(
+        reference_label_vectors,
+        predicted_label_vectors,
+        target_names=CHEXPERT_14_LABELS,
+        output_dict=True,
+        zero_division=0,
+    )
+    chexpert_5_indices = [CHEXPERT_14_LABELS.index(label) for label in CHEXPERT_5_LABELS]
+    reference_label_vectors_5 = [[row[idx] for idx in chexpert_5_indices] for row in reference_label_vectors]
+    predicted_label_vectors_5 = [[row[idx] for idx in chexpert_5_indices] for row in predicted_label_vectors]
+    report_5 = classification_report(
+        reference_label_vectors_5,
+        predicted_label_vectors_5,
+        target_names=CHEXPERT_5_LABELS,
+        output_dict=True,
+        zero_division=0,
+    )
+    per_label_f1 = {label: float(report_14[label]["f1-score"]) for label in CHEXPERT_14_LABELS}
+    return {
+        "chexpert_f1_14_micro": float(report_14["micro avg"]["f1-score"]),
+        "chexpert_f1_14_macro": float(report_14["macro avg"]["f1-score"]),
+        "chexpert_f1_5_micro": float(report_5["micro avg"]["f1-score"]),
+        "chexpert_f1_5_macro": float(report_5["macro avg"]["f1-score"]),
+        "chexpert_f1_micro": float(report_14["micro avg"]["f1-score"]),
+        "chexpert_f1_macro": float(report_14["macro avg"]["f1-score"]),
+        "chexpert_per_label_f1": per_label_f1,
+        "chexpert_label_names": list(CHEXPERT_14_LABELS),
+        "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
+        "chexpert_available": True,
+        "chexpert_error": None,
+    }
 
 
 def _ngrams(tokens: Sequence[str], n: int) -> Counter:
@@ -272,15 +538,6 @@ def cider_d(predictions: Sequence[str], references: Sequence[str], max_n: int = 
     return float(sum(scores) / max(len(scores), 1))
 
 
-def _extract_chexpert_labels(report: str) -> set[str]:
-    normalized = _normalize_text(report)
-    labels = set()
-    for label, patterns in CHEXPERT_LABEL_PATTERNS.items():
-        if any(re.search(pattern, normalized) for pattern in patterns):
-            labels.add(label)
-    return labels
-
-
 def _compute_chexpert_f1(predicted_labels_per_report: Sequence[set[str]], reference_labels: Sequence[Dict[str, int]], label_names: Sequence[str]) -> Dict[str, object]:
     tp = Counter()
     fp = Counter()
@@ -324,46 +581,62 @@ def _compute_chexpert_f1(predicted_labels_per_report: Sequence[set[str]], refere
 
 
 def _reference_label_maps_from_reports(references: Sequence[str]) -> List[Dict[str, int]]:
-    reference_label_maps = []
-    for reference in references:
-        ref_labels = _extract_chexpert_labels(reference)
-        reference_label_maps.append({label: int(label in ref_labels) for label in CHEXPERT_14_LABELS})
-    return reference_label_maps
+    try:
+        scorer = _get_chexbert_scorer()
+        label_vectors = scorer.label_reports(references)
+    except Exception:
+        return []
+    return [
+        {label: int(label_vector[idx]) for idx, label in enumerate(CHEXPERT_14_LABELS)}
+        for label_vector in label_vectors
+    ]
 
 
 def chexpert_label_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
-    predicted_labels_per_report = [_extract_chexpert_labels(prediction) for prediction in predictions]
-    reference_label_maps = _reference_label_maps_from_reports(references)
-    chexpert_14 = _compute_chexpert_f1(predicted_labels_per_report, reference_label_maps, CHEXPERT_14_LABELS)
-    chexpert_5 = _compute_chexpert_f1(predicted_labels_per_report, reference_label_maps, CHEXPERT_5_LABELS)
-    return {
-        "chexpert_f1_14_micro": chexpert_14["micro_f1"],
-        "chexpert_f1_14_macro": chexpert_14["macro_f1"],
-        "chexpert_f1_5_micro": chexpert_5["micro_f1"],
-        "chexpert_f1_5_macro": chexpert_5["macro_f1"],
-        "chexpert_f1_micro": chexpert_14["micro_f1"],
-        "chexpert_f1_macro": chexpert_14["macro_f1"],
-        "chexpert_per_label_f1": chexpert_14["chexpert_per_label_f1"],
-        "chexpert_label_names": chexpert_14["chexpert_label_names"],
-        "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
-    }
+    try:
+        scorer = _get_chexbert_scorer()
+        predicted_label_vectors = scorer.label_reports(predictions)
+        reference_label_vectors = scorer.label_reports(references)
+        return _compute_chexpert_metrics_from_label_vectors(predicted_label_vectors, reference_label_vectors)
+    except Exception as exc:
+        return {
+            "chexpert_f1_14_micro": None,
+            "chexpert_f1_14_macro": None,
+            "chexpert_f1_5_micro": None,
+            "chexpert_f1_5_macro": None,
+            "chexpert_f1_micro": None,
+            "chexpert_f1_macro": None,
+            "chexpert_per_label_f1": {label: None for label in CHEXPERT_14_LABELS},
+            "chexpert_label_names": list(CHEXPERT_14_LABELS),
+            "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
+            "chexpert_available": False,
+            "chexpert_error": repr(exc),
+        }
 
 
 def chexpert_label_f1_from_reference_labels(predictions: Sequence[str], reference_labels: Sequence[Dict[str, int]]) -> Dict[str, object]:
-    predicted_labels_per_report = [_extract_chexpert_labels(prediction) for prediction in predictions]
-    chexpert_14 = _compute_chexpert_f1(predicted_labels_per_report, reference_labels, CHEXPERT_14_LABELS)
-    chexpert_5 = _compute_chexpert_f1(predicted_labels_per_report, reference_labels, CHEXPERT_5_LABELS)
-    return {
-        "chexpert_f1_14_micro": chexpert_14["micro_f1"],
-        "chexpert_f1_14_macro": chexpert_14["macro_f1"],
-        "chexpert_f1_5_micro": chexpert_5["micro_f1"],
-        "chexpert_f1_5_macro": chexpert_5["macro_f1"],
-        "chexpert_f1_micro": chexpert_14["micro_f1"],
-        "chexpert_f1_macro": chexpert_14["macro_f1"],
-        "chexpert_per_label_f1": chexpert_14["chexpert_per_label_f1"],
-        "chexpert_label_names": chexpert_14["chexpert_label_names"],
-        "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
-    }
+    try:
+        scorer = _get_chexbert_scorer()
+        predicted_label_vectors = scorer.label_reports(predictions)
+        reference_label_vectors = [
+            [int(reference_label_map.get(label, 0)) for label in CHEXPERT_14_LABELS]
+            for reference_label_map in reference_labels
+        ]
+        return _compute_chexpert_metrics_from_label_vectors(predicted_label_vectors, reference_label_vectors)
+    except Exception as exc:
+        return {
+            "chexpert_f1_14_micro": None,
+            "chexpert_f1_14_macro": None,
+            "chexpert_f1_5_micro": None,
+            "chexpert_f1_5_macro": None,
+            "chexpert_f1_micro": None,
+            "chexpert_f1_macro": None,
+            "chexpert_per_label_f1": {label: None for label in CHEXPERT_14_LABELS},
+            "chexpert_label_names": list(CHEXPERT_14_LABELS),
+            "chexpert_5_label_names": list(CHEXPERT_5_LABELS),
+            "chexpert_available": False,
+            "chexpert_error": repr(exc),
+        }
 
 
 def radgraph_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[str, object]:
@@ -384,10 +657,22 @@ def radgraph_f1(predictions: Sequence[str], references: Sequence[str]) -> Dict[s
         except FileExistsError:
             return None
 
+    model_cache_dir, tokenizer_cache_dir, offline_ready = _resolve_radgraph_runtime_paths(model_type=RADGRAPH_MODEL_TYPE)
+    env_overrides = {}
+    if offline_ready:
+        env_overrides["HF_HUB_OFFLINE"] = "1"
+        env_overrides["TRANSFORMERS_OFFLINE"] = "1"
+
     os.makedirs = safe_makedirs
     try:
-        scorer = F1RadGraph(reward_level="all", model_type="radgraph-xl")
-        mean_reward, *_ = scorer(hyps=list(predictions), refs=list(references))
+        with _temporary_env(env_overrides):
+            scorer = F1RadGraph(
+                reward_level="all",
+                model_type=RADGRAPH_MODEL_TYPE,
+                model_cache_dir=str(model_cache_dir),
+                tokenizer_cache_dir=str(tokenizer_cache_dir) if tokenizer_cache_dir is not None else None,
+            )
+            mean_reward, *_ = scorer(hyps=list(predictions), refs=list(references))
     except Exception as exc:  # pragma: no cover - optional dependency/runtime path
         return {
             "radgraph_f1": None,

@@ -20,7 +20,7 @@ metrics:
 
 **Layer-Wise Anatomical Attention model**
 
-> Best current model in this collection: [`manu02/LAnA-v5`](https://huggingface.co/manu02/LAnA-v5)
+> Best current model in this collection: [`manu02/LAnA-Arxiv`](https://huggingface.co/manu02/LAnA-Arxiv)
 
 [![ArXiv](https://img.shields.io/badge/ArXiv-2512.16841-B31B1B?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2512.16841)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-devmuniz-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/devmuniz)
@@ -106,45 +106,39 @@ for clinical deployment, and should not be used as a substitute for professional
 
 ## MIMIC Test Results
 
-Frontal-only evaluation using `PA/AP` studies only.
-
 These comparison tables are refreshed across the full LAnA collection whenever any collection model is evaluated.
 
-### Cross-Model Comparison: All Frontal Test Studies
+### Cross-Model Comparison: All Frontal Test Studies (`3041` studies)
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA (Model still training) | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 | LAnA-v5 |
+| Metric | [LAnA-MIMIC-CHEXPERT](https://huggingface.co/manu02/LAnA-MIMIC-CHEXPERT) | [LAnA-MIMIC](https://huggingface.co/manu02/LAnA-MIMIC) | [LAnA](https://huggingface.co/manu02/LAnA) | [LAnA-v2](https://huggingface.co/manu02/LAnA-v2) | [LAnA-v3](https://huggingface.co/manu02/LAnA-v3) | [LAnA-v4](https://huggingface.co/manu02/LAnA-v4) | [LAnA-v5](https://huggingface.co/manu02/LAnA-v5) | [LAnA-Arxiv](https://huggingface.co/manu02/LAnA-Arxiv) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Model still training` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
-| Number of studies | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` | `3041` |
-| ROUGE-L | `0.1513` | `0.1653` | `0.1211` | `0.1686` | `0.1670` | `0.1745` | `0.1675` | `0.1702` |
-| BLEU-1 | `0.1707` | `0.1916` | `0.1435` | `0.2091` | `0.2174` | `0.2346` | `0.2244` | `0.2726` |
-| BLEU-4 | `0.0357` | `0.0386` | `0.0236` | `0.0417` | `0.0417` | `0.0484` | `0.0441` | `0.0503` |
-| METEOR | `0.2079` | `0.2202` | `0.1333` | `0.2298` | `0.2063` | `0.2129` | `0.2002` | `0.2607` |
-| RadGraph F1 | `0.0918` | `0.0921` | `0.0844` | `0.1024` | `0.1057` | `0.0939` | `0.0794` | `0.0853` |
-| RadGraph entity F1 | `0.1399` | `0.1459` | `0.1208` | `0.1587` | `0.1569` | `0.1441` | `0.1437` | `0.1481` |
-| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1153` | `0.1443` | `0.1474` | `0.1280` | `0.1293` | `0.1308` |
-| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.1367` | `0.2116` | `0.1401` | `0.3116` | `0.2196` | `0.3552` |
-| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.0535` | `0.2512` | `0.2506` | `0.2486` | `0.0538` | `0.3777` |
-| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.0609` | `0.1095` | `0.0401` | `0.1363` | `0.0724` | `0.1790` |
-| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.0375` | `0.1644` | `0.1004` | `0.1686` | `0.0333` | `0.2647` |
+| ROUGE-L | `0.1513` | `0.1653` | `0.1686` | `0.1670` | **0.1745** | `0.1675` | `0.1702` | `` |
+| BLEU-1 | `0.1707` | `0.1916` | `0.2091` | `0.2174` | `0.2346` | `0.2244` | **0.2726** | `` |
+| BLEU-4 | `0.0357` | `0.0386` | `0.0417` | `0.0417` | `0.0484` | `0.0441` | **0.0503** | `` |
+| METEOR | `0.2079` | `0.2202` | `0.2298` | `0.2063` | `0.2129` | `0.2002` | **0.2607** | `` |
+| RadGraph F1 | `0.0918` | `0.0921` | `0.1024` | **0.1057** | `0.0939` | `0.0794` | `0.0853` | `` |
+| RadGraph entity F1 | `0.1399` | `0.1459` | **0.1587** | `0.1569` | `0.1441` | `0.1437` | `0.1481` | `` |
+| RadGraph relation F1 | `0.1246` | `0.1322` | `0.1443` | **0.1474** | `0.1280` | `0.1293` | `0.1308` | `` |
+| CheXpert F1 14-micro | `0.1829` | `0.1565` | `0.2116` | `0.1401` | `0.3116` | `0.2196` | **0.3552** | `` |
+| CheXpert F1 5-micro | `0.2183` | `0.1530` | `0.2512` | `0.2506` | `0.2486` | `0.0538` | **0.3777** | `` |
+| CheXpert F1 14-macro | `0.1095` | `0.0713` | `0.1095` | `0.0401` | `0.1363` | `0.0724` | **0.1790** | `` |
+| CheXpert F1 5-macro | `0.1634` | `0.1007` | `0.1644` | `0.1004` | `0.1686` | `0.0333` | **0.2647** | `` |
 
-### Cross-Model Comparison: Findings-Only Frontal Test Studies
+### Cross-Model Comparison: Findings-Only Frontal Test Studies (`2210` studies)
 
-| Metric | LAnA-MIMIC-CHEXPERT | LAnA-MIMIC | LAnA (Model still training) | LAnA | LAnA-v2 | LAnA-v3 | LAnA-v4 | LAnA-v5 |
+| Metric | [LAnA-MIMIC-CHEXPERT](https://huggingface.co/manu02/LAnA-MIMIC-CHEXPERT) | [LAnA-MIMIC](https://huggingface.co/manu02/LAnA-MIMIC) | [LAnA](https://huggingface.co/manu02/LAnA) | [LAnA-v2](https://huggingface.co/manu02/LAnA-v2) | [LAnA-v3](https://huggingface.co/manu02/LAnA-v3) | [LAnA-v4](https://huggingface.co/manu02/LAnA-v4) | [LAnA-v5](https://huggingface.co/manu02/LAnA-v5) | [LAnA-Arxiv](https://huggingface.co/manu02/LAnA-Arxiv) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Run status | `Completed` | `Completed` | `Model still training` | `Completed` | `Completed` | `Completed` | `Completed` | `Completed` |
-| Number of studies | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` | `2210` |
-| ROUGE-L | `0.1576` | `0.1720` | `0.1251` | `0.1771` | `0.1771` | `0.1848` | `0.1753` | `0.1781` |
-| BLEU-1 | `0.1754` | `0.2003` | `0.1502` | `0.2177` | `0.2263` | `0.2480` | `0.2337` | `0.2774` |
-| BLEU-4 | `0.0405` | `0.0449` | `0.0271` | `0.0484` | `0.0487` | `0.0573` | `0.0509` | `0.0575` |
-| METEOR | `0.2207` | `0.2347` | `0.1382` | `0.2466` | `0.2240` | `0.2310` | `0.2137` | `0.2760` |
-| RadGraph F1 | `0.1010` | `0.1000` | `0.0889` | `0.1119` | `0.1181` | `0.1046` | `0.0906` | `0.0938` |
-| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1275` | `0.1713` | `0.1739` | `0.1584` | `0.1566` | `0.1580` |
-| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1217` | `0.1549` | `0.1628` | `0.1405` | `0.1410` | `0.1395` |
-| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1535` | `0.1907` | `0.1365` | `0.2921` | `0.2205` | `0.3173` |
-| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.0440` | `0.2415` | `0.2455` | `0.2394` | `0.0555` | `0.3372` |
-| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.0606` | `0.1039` | `0.0381` | `0.1326` | `0.0714` | `0.1632` |
-| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.0314` | `0.1578` | `0.0952` | `0.1636` | `0.0342` | `0.2343` |
+| ROUGE-L | `0.1576` | `0.1720` | `0.1771` | `0.1771` | **0.1848** | `0.1753` | `0.1781` | `` |
+| BLEU-1 | `0.1754` | `0.2003` | `0.2177` | `0.2263` | `0.2480` | `0.2337` | **0.2774** | `` |
+| BLEU-4 | `0.0405` | `0.0449` | `0.0484` | `0.0487` | `0.0573` | `0.0509` | **0.0575** | `` |
+| METEOR | `0.2207` | `0.2347` | `0.2466` | `0.2240` | `0.2310` | `0.2137` | **0.2760** | `` |
+| RadGraph F1 | `0.1010` | `0.1000` | `0.1119` | `0.1181` | `0.1046` | `0.0906` | `0.0938` | **0.1831** |
+| RadGraph entity F1 | `0.1517` | `0.1577` | `0.1713` | `0.1739` | `0.1584` | `0.1566` | `0.1580` | **0.1831** |
+| RadGraph relation F1 | `0.1347` | `0.1413` | `0.1549` | **0.1628** | `0.1405` | `0.1410` | `0.1395` | `0.1596` |
+| CheXpert F1 14-micro | `0.1651` | `0.1442` | `0.1907` | `0.1365` | `0.2921` | `0.2205` | `0.3173` | **0.3228** |
+| CheXpert F1 5-micro | `0.2152` | `0.1716` | `0.2415` | `0.2455` | `0.2394` | `0.0555` | `0.3372` | **0.3745** |
+| CheXpert F1 14-macro | `0.1047` | `0.0700` | `0.1039` | `0.0381` | `0.1326` | `0.0714` | `0.1632` | **0.2190** |
+| CheXpert F1 5-macro | `0.1611` | `0.1112` | `0.1578` | `0.0952` | `0.1636` | `0.0342` | `0.2343` | **0.3354** |
 
 ## Data
 
@@ -166,6 +160,7 @@ These comparison tables are refreshed across the full LAnA collection whenever a
 - `LAnA-v3`: This version keeps the same training setup as `LAnA`, including the effective global batch size of `16`, but changes how EOS is handled so training and generation follow the same behavior. The model no longer uses the EOS token during training, and generation remained greedy without stopping when an EOS token was produced. In the previous setup, decoding was also greedy, stopped at EOS, and used a maximum of `128` new tokens.
 - `LAnA-v4`: This version keeps the same decoding behavior as `LAnA-v3`, but increases the effective global batch size from `16` to `128`.
 - `LAnA-v5`: This version uses the training recipe from the original `LAnA` paper, while switching to the legacy [`CXR-Findings-AI`](https://huggingface.co/spaces/manu02/CXR-Findings-AI) generation behavior.
+- `LAnA-Arxiv`: This model is the report-generation model created in the arXiv paper, packaged locally with its original legacy generation code.
 
 ## Training Snapshot
 

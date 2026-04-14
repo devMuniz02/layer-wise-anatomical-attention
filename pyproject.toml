@@ -19,6 +19,7 @@ dependencies = [
   "numpy>=1.26.0",
   "wandb>=0.17.0",
   "pyyaml>=6.0.0",
+  "f1chexbert==0.0.2",
 ]
 
 [tool.setuptools]

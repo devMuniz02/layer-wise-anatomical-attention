@@ -1,4 +1,5 @@
 from typing import Optional, Union
+import inspect
 
 import torch
 import torch.nn.functional as F
@@ -10,6 +11,8 @@ from transformers.modeling_attn_mask_utils import _prepare_4d_attention_mask_for
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions, CausalLMOutputWithCrossAttentions
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention, GPT2Block, eager_attention_forward
+
+_CREATE_CAUSAL_MASK_EMBEDS_ARG = "inputs_embeds" if "inputs_embeds" in inspect.signature(create_causal_mask).parameters else "input_embeds"
 
 
 class GPT2AttentionModified(GPT2Attention):
@@ -169,14 +172,15 @@ class GPT2ModelModified(GPT2Model):
         if attention_mask is not None and attention_mask.ndim < 4:
             attention_mask = attention_mask.view(batch_size, -1)
 
-        causal_mask = create_causal_mask(
-            config=self.config_causal,
-            input_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=position_ids,
-        )
+        causal_mask_kwargs = {
+            "config": self.config_causal,
+            _CREATE_CAUSAL_MASK_EMBEDS_ARG: inputs_embeds,
+            "attention_mask": attention_mask,
+            "cache_position": cache_position,
+            "past_key_values": past_key_values,
+            "position_ids": position_ids,
+        }
+        causal_mask = create_causal_mask(**causal_mask_kwargs)
 
         _use_sdpa = self._attn_implementation == "sdpa" and output_attentions is False and head_mask is None
         if self.config.add_cross_attention and encoder_hidden_states is not None:
@@ -368,12 +372,28 @@ def expand_gpt2_positional_embeddings(
     return model
 
 
-def create_decoder(text_model_name: str, attention_implementation: str, max_position_embeddings: int, **decoder_kwargs):
+def create_decoder(
+    text_model_name: str,
+    attention_implementation: str,
+    max_position_embeddings: int,
+    load_pretrained: bool = True,
+    vocab_size: Optional[int] = None,
+    pad_token_id: Optional[int] = None,
+    **decoder_kwargs,
+):
     config = GPT2Config.from_pretrained(text_model_name)
     config._attn_implementation = attention_implementation
     config.n_positions = max_position_embeddings
     config.n_ctx = max_position_embeddings
+    config.tie_word_embeddings = False
+    if vocab_size is not None:
+        config.vocab_size = vocab_size
+    if pad_token_id is not None:
+        config.pad_token_id = pad_token_id
     config.use_cache = decoder_kwargs.pop("use_cache", True)
-    decoder = GPT2LMHeadModelModified.from_pretrained(text_model_name, config=config, **decoder_kwargs)
+    if load_pretrained:
+        decoder = GPT2LMHeadModelModified.from_pretrained(text_model_name, config=config, **decoder_kwargs)
+    else:
+        decoder = GPT2LMHeadModelModified(config)
     decoder.config._attn_implementation = attention_implementation
     return expand_gpt2_positional_embeddings(decoder, new_max_positions=max_position_embeddings, mode="linear")
